@@ -4,19 +4,7 @@ Assert-DockerDaemon
 $repoRoot = Get-RepoRoot
 $mount = "${repoRoot}:/repo"
 
-$backendCommand = @'
-python -m pip install --upgrade pip &&
-pip install -r requirements.txt &&
-python -m ruff check . &&
-python -m black --check . &&
-python -m mypy app &&
-python -m app.cli check-db &&
-python -m app.cli ensure-storage &&
-python -m app.cli check-storage-layout --user-id smoke-user --job-id smoke-job &&
-python -m app.cli ensure-kafka-topics &&
-python -m app.cli smoke-firebase &&
-python -m app.cli smoke-http
-'@
+$backendCommand = "python -m pip install --upgrade pip && pip install -r requirements.txt && python -m ruff check . && python -m black --check . && python -m mypy app && python -m app.cli check-db && python -m app.cli ensure-storage && python -m app.cli check-storage-layout --user-id smoke-user --job-id smoke-job && python -m app.cli ensure-kafka-topics && python -m app.cli smoke-firebase && python -m app.cli smoke-http"
 
 docker run --rm `
   --network pdfextract_default `

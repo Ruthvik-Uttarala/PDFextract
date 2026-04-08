@@ -4,11 +4,7 @@ Assert-DockerDaemon
 $repoRoot = Get-RepoRoot
 $mount = "${repoRoot}:/repo"
 
-$frontendCommand = @'
-npm install &&
-npm run lint &&
-npm run build
-'@
+$frontendCommand = "npm install && npm run lint && npm run build"
 
 docker run --rm `
   -v $mount `

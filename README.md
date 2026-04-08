@@ -46,7 +46,7 @@ PDFextract/
 ├── scripts/            Deterministic local bootstrap and validation scripts
 ├── docker-compose.yml  PostgreSQL 16, MinIO, Kafka (KRaft)
 ├── package.json        Root orchestration scripts for the frontend
-└── vercel.json         Root-level Vercel-safe install/build commands
+└── vercel.json         Minimal framework declaration for Vercel
 ```
 
 ## Prerequisites
@@ -157,17 +157,16 @@ This repository keeps the root as orchestration only while leaving a deployable 
 
 Current in-repo Vercel safeguards:
 
-- root `vercel.json` points install/build commands at `frontend/`
-- root `package.json` exposes orchestration scripts only
-- the actual app stays isolated in `frontend/`
+- the Vercel project Root Directory is `frontend`
+- the Framework Preset is `Next.js`
+- the Node.js version is `22.x`
+- root `package.json` remains local orchestration only
 
 Recommended project settings for the connected Vercel project:
 
 - Root Directory: `frontend`
 - Framework Preset: `Next.js`
 - Node.js version: `22.x`
-
-If the dashboard settings are not yet updated, the root-level Vercel config is the repo-side fallback to keep deployments truthful during the monorepo transition.
 
 ## Canonical Docs
 
