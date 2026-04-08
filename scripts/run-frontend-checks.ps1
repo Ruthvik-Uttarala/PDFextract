@@ -7,7 +7,7 @@ $mount = "${repoRoot}:/repo"
 $frontendCommand = @'
 npm install &&
 npm run lint &&
-npm run typecheck
+npm run build
 '@
 
 docker run --rm `
