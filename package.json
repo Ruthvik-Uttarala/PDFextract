@@ -1,0 +1,15 @@
+{
+  "name": "pdfextract-monorepo",
+  "private": true,
+  "engines": {
+    "node": "22.11.0",
+    "npm": "10.9.0"
+  },
+  "scripts": {
+    "build": "npm --prefix frontend run build",
+    "dev": "npm --prefix frontend run dev",
+    "frontend:install": "npm --prefix frontend install",
+    "frontend:lint": "npm --prefix frontend run lint",
+    "frontend:typecheck": "npm --prefix frontend run typecheck"
+  }
+}
