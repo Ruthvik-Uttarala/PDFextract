@@ -1,0 +1,128 @@
+﻿Diagnose log at 2026-04-08T16:03:52Z
+
+AppPath: C:\Program Files\Git\mingw64\bin\git-credential-manager.exe
+InstallDir: C:\Program Files\Git\mingw64\bin\
+Version: 2.5.1+90d5f897f164a8fe07d2aa3bf7db439b0b4e03ea
+
+------------
+Diagnostic: Environment
+Skipped: False
+Success: True
+Exception: None
+Log:
+OSType: Windows
+OSVersion: 10.0 (build 26200)
+Reading environment variables... OK
+ Variables:
+HOMEPATH=\Users\RUTHVIK
+DriverData=C:\Windows\System32\Drivers\DriverData
+COMPUTERNAME=DESKTOP-F4E4F0E
+GIT_TRACE2_PARENT_SID=3fcdbb23-ce5f-4f76-b3c0-5b7baaacaf0e
+CommonProgramFiles(x86)=C:\Program Files (x86)\Common Files
+ProgramW6432=C:\Program Files
+OneDrive=C:\Users\RUTHVIK\OneDrive
+CODEX_THREAD_ID=019d6d5f-b041-7ad0-9a43-7c990b761803
+SESSIONNAME=Console
+TMP=C:\Users\RUTHVIK\AppData\Local\Temp
+LC_CTYPE=C.UTF-8
+USERDOMAIN=DESKTOP-F4E4F0E
+INTEL_DEV_REDIST=C:\Program Files (x86)\Common Files\Intel\Shared Libraries\
+VSCODE_IPC_HOOK=\\.\pipe\5683d2f2-1.114.0-main-sock
+POWERSHELL_DISTRIBUTION_CHANNEL=MSI:Windows 10 Home Single Language
+TEMP=C:\Users\RUTHVIK\AppData\Local\Temp
+LOCALAPPDATA=C:\Users\RUTHVIK\AppData\Local
+MSYSTEM=MINGW64
+TERM=xterm-256color
+PROCESSOR_IDENTIFIER=Intel64 Family 6 Model 165 Stepping 2, GenuineIntel
+__PSLockDownPolicy=0
+ProgramData=C:\ProgramData
+windir=C:\WINDOWS
+EFC_8452_1592913036=1
+PROCESSOR_REVISION=a502
+PROCESSOR_LEVEL=6
+NUMBER_OF_PROCESSORS=8
+TMPDIR=C:\Users\RUTHVIK\AppData\Local\Temp
+ZES_ENABLE_SYSMAN=1
+ProgramFiles(x86)=C:\Program Files (x86)
+PUBLIC=C:\Users\Public
+VSCODE_NLS_CONFIG={"userLocale":"en-us","osLocale":"en-us","resolvedLanguage":"en","defaultMessagesFile":"C:\\Users\\RUTHVIK\\AppData\\Local\\Programs\\Microsoft VS Code\\e7fb5e96c0\\resources\\app\\out\\nls.messages.json","locale":"en-us","availableLanguages":{}}
+FPS_BROWSER_USER_PROFILE_STRING=Default
+CommonProgramFiles=C:\Program Files (x86)\Common Files
+VSCODE_ESM_ENTRYPOINT=vs/workbench/api/node/extensionHostProcess
+CHROME_CRASHPAD_PIPE_NAME=\\.\pipe\crashpad_22592_ASMNBUPMAYALEYAO
+ProgramFiles=C:\Program Files (x86)
+CODEX_SANDBOX_NETWORK_DISABLED=1
+PLINK_PROTOCOL=ssh
+COLORTERM=truecolor
+MSYS=disable_pcon
+PATH=C:/Program Files/Git/mingw64/libexec/git-core;C:\Program Files\Git\mingw64\bin;C:\Program Files\Git\usr\bin;C:\Users\RUTHVIK\bin;C:\Program Files\PowerShell\7;C:\Users\RUTHVIK\.codex\tmp\arg0\codex-arg0Dq1ugp;C:\Users\RUTHVIK\AppData\Local\Programs\Microsoft VS Code;C:\Program Files\Common Files\Oracle\Java\javapath;C:\Python314\Scripts\;C:\Python314\;C:\Program Files\Volta\;C:\Python312\Scripts\;C:\Python312\;C:\Program Files (x86)\Common Files\Intel\Shared Libraries\redist\intel64\compiler;Common Files\Oracle\Java\javapath;C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0\;C:\Windows\System32\OpenSSH\; (x86)\NVIDIA Corporation\PhysX\Common;NVIDIA Corporation\NVIDIA NvDLISR;dotnet\;C:\WINDOWS\system32;C:\WINDOWS;C:\WINDOWS\System32\Wbem;C:\WINDOWS\System32\WindowsPowerShell\v1.0\;C:\WINDOWS\System32\OpenSSH\;Git\cmd;C:\ProgramData\chocolatey\bin;C:\Users\RUTHVIK\AppData\Roaming\nvm;C:\Program Files\nodejs;C:\Program Files\dotnet\;C:\Program Files\Git\cmd;C:\Program Files\;C:\Program Files\Amazon\AWSCLIV2\;C:\Program Files\PowerShell\7\;C:\Program Files\Docker\Docker\resources\bin;C:\Users\RUTHVIK\.local\bin;C:\Users\RUTHVIK\AppData\Local\Volta\bin;C:\Users\RUTHVIK\AppData\Local\Programs\Python\Python310\Scripts\;C:\Users\RUTHVIK\AppData\Local\Programs\Python\Python310\;C:\Users\RUTHVIK\AppData\Local\Microsoft\WindowsApps;C:\Users\RUTHVIK\AppData\Roaming\nvm;C:\Program Files\nodejs;C:\MinGW\bin;C:\Users\RUTHVIK\AppData\Roaming\npm;C:\Users\RUTHVIK\AppData\Local\Programs\Antigravity\bin;C:\Users\RUTHVIK\Downloads\stripe_1.35.0_windows_x86_64;C:\Users\RUTHVIK\AppData\Local\Google\Cloud SDK\google-cloud-sdk\bin;C:\Users\RUTHVIK\AppData\Local\Programs\Microsoft VS Code\bin;C:\Users\RUTHVIK\AppData\Local\Microsoft\WinGet\Packages\Gitlab.Runner_Microsoft.Winget.Source_8wekyb3d8bbwe;;c:\Users\RUTHVIK\.vscode\extensions\openai.chatgpt-26.325.31654-win32-x64\bin\windows-x86_64
+ChocolateyInstall=C:\ProgramData\chocolatey
+DEBUG=release
+VSCODE_CODE_CACHE_PATH=C:\Users\RUTHVIK\AppData\Roaming\Code\CachedData\e7fb5e96c0730b9deb70b33781f98e2f35975036
+PATHEXT=.COM;.EXE;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH;.MSC;.PY;.PYW;.CPL
+NVM_SYMLINK=C:\Program Files\nodejs
+NVM_HOME=C:\Users\RUTHVIK\AppData\Roaming\nvm
+HOME=C:\Users\RUTHVIK
+VSCODE_HANDLES_UNCAUGHT_ERRORS=true
+CODEX_INTERNAL_ORIGINATOR_OVERRIDE=codex_vscode
+CommonProgramW6432=C:\Program Files\Common Files
+PROCESSOR_ARCHITEW6432=AMD64
+LOGONSERVER=\\DESKTOP-F4E4F0E
+VSCODE_CWD=C:\Users\RUTHVIK\AppData\Local\Programs\Microsoft VS Code
+GIT_EXEC_PATH=C:/Program Files/Git/mingw64/libexec/git-core
+SystemRoot=C:\WINDOWS
+USERDOMAIN_ROAMINGPROFILE=DESKTOP-F4E4F0E
+APPDATA=C:\Users\RUTHVIK\AppData\Roaming
+HOMEDRIVE=C:
+RUST_LOG=warn
+VSCODE_PID=22592
+PSModulePath=C:\Users\RUTHVIK\Documents\PowerShell\Modules;C:\Program Files\PowerShell\Modules;c:\program files\powershell\7\Modules;C:\Program Files\WindowsPowerShell\Modules;C:\WINDOWS\system32\WindowsPowerShell\v1.0\Modules
+ELECTRON_RUN_AS_NODE=1
+USERNAME=RUTHVIK
+MIC_LD_LIBRARY_PATH=C:\Program Files (x86)\Common Files\Intel\Shared Libraries\compiler\lib\mic
+FPS_BROWSER_APP_PROFILE_STRING=Internet Explorer
+PROCESSOR_ARCHITECTURE=x86
+USERPROFILE=C:\Users\RUTHVIK
+OS=Windows_NT
+ComSpec=C:\WINDOWS\system32\cmd.exe
+ChocolateyLastPathUpdate=133540696910007807
+SystemDrive=C:
+VSCODE_CRASH_REPORTER_PROCESS_TYPE=extensionHost
+OneDriveConsumer=C:\Users\RUTHVIK\OneDrive
+ALLUSERSPROFILE=C:\ProgramData
+
+
+------------
+Diagnostic: File system
+Skipped: False
+Success: True
+Exception: None
+Log:
+Temporary directory is 'C:\Users\RUTHVIK\AppData\Local\Temp\'...
+Checking basic file I/O...
+Writing to temporary file 'C:\Users\RUTHVIK\AppData\Local\Temp\567f4a5785657b1a9134064a'... OK
+Reading from temporary file 'C:\Users\RUTHVIK\AppData\Local\Temp\567f4a5785657b1a9134064a'... OK
+Deleting temporary file 'C:\Users\RUTHVIK\AppData\Local\Temp\567f4a5785657b1a9134064a'... OK
+Testing IFileSystem instance...
+UserHomePath: C:\Users\RUTHVIK
+UserDataDirectoryPath: C:\Users\RUTHVIK\.gcm
+GetCurrentDirectory(): C:\Users\RUTHVIK\PDFextract
+
+------------
+Diagnostic: Networking
+Skipped: False
+Success: True
+Exception: None
+Log:
+Checking networking and HTTP stack...
+Creating HTTP client... OK
+IsNetworkAvailable: True
+Sending HEAD request to http://example.com...Sending HEAD request to https://example.com... OK
+Acquiring free TCP port... OK
+Testing local HTTP loopback connections...
+Creating new HTTP listener for http://localhost:53289/... OK
+Waiting for loopback connection... OK
+Writing response... OK
+Waiting for response data... OK
+Loopback connection data OK
+
