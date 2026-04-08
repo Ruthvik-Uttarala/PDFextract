@@ -11,42 +11,44 @@ PDFextract is a focused PDF-to-Excel processing product with a frozen stack:
 - LLM: Gemini only
 - Output: Excel `.xlsx` only
 
-This repository currently implements **Phase 0** and the **Phase 1 foundation scaffold** only. It does **not** claim the upload, job-processing, extraction, or Excel-generation product flow is complete yet.
+This repository now implements the full repo-side MVP path through **Phases 2 to 15** for local development and validation. The remaining production work is Phase 16 infrastructure provisioning and secret wiring for the approved cloud stack.
 
 ## Current State
 
 Implemented in-repo:
 
-- canonical monorepo skeleton under `frontend/`, `backend/`, `docs/`, and `scripts/`
-- the six canonical project documents copied into `docs/`
-- pinned runtime version files for Node and Python
-- a Vercel-safe Next.js frontend scaffold with strict TypeScript and a real Firebase client bootstrap path
-- a Flask backend scaffold with structured config, readiness/auth endpoints, and real PostgreSQL/MinIO/Kafka/Firebase integration code paths
+- canonical monorepo structure under `frontend/`, `backend/`, `docs/`, and `scripts/`
+- canonical SQLAlchemy models, Alembic migration, repositories, auth upsert flow, and shared status/stage constants
+- Flask API surface for health, readiness, identity, uploads, jobs, admin jobs, downloads, and retry
+- deterministic storage keys and local object persistence through MinIO
+- Kafka submit and retry publication flow plus Lambda-compatible worker handlers and local worker execution
+- PDF reading with PyMuPDF and pdfplumber
+- Gemini extraction wrapper with deterministic mock mode for local/testing runs
+- normalization, validation, extraction result persistence, and Excel generation with openpyxl
+- Next.js App Router frontend with Firebase Google sign-in shell, route guards, dashboard, upload, jobs, job detail, admin list, and admin retry UI
+- backend unit and integration tests plus frontend integration tests
 - Docker Compose infrastructure for PostgreSQL 16, MinIO, and Kafka in KRaft mode
-- deterministic PowerShell scripts to bootstrap infra and run validation
+- reproducible PowerShell validation scripts for backend and frontend checks
 
-Intentionally not implemented yet:
+Still blocked on external production access:
 
-- upload API
-- jobs/history/detail APIs
-- admin retry APIs
-- Lambda job handlers
-- Gemini extraction pipeline
-- validation pipeline
-- Excel generation
-- production auth UX
+- production Flask hosting target and deployment access
+- production PostgreSQL credentials
+- AWS S3, Lambda, and Kafka-compatible broker provisioning and credentials
+- production Firebase admin credentials
+- production Gemini / GCP credentials
 
 ## Repository Layout
 
 ```text
 PDFextract/
-├── frontend/           Next.js 14.2.25 App Router scaffold
-├── backend/            Flask 3.1.0 app, dependency clients, and smoke CLI
+├── frontend/           Next.js 14.2.25 App Router application
+├── backend/            Flask 3.1.0 API, worker, services, migrations, and tests
 ├── docs/               Canonical project contracts copied into the repo
-├── scripts/            Deterministic local bootstrap and validation scripts
+├── scripts/            Local infra/bootstrap/check scripts
 ├── docker-compose.yml  PostgreSQL 16, MinIO, Kafka (KRaft)
-├── package.json        Root orchestration scripts for the frontend
-└── vercel.json         Minimal framework declaration for Vercel
+├── package.json        Root orchestration scripts
+└── vercel.json         Root-level Vercel safeguard for the frontend project
 ```
 
 ## Prerequisites
@@ -81,11 +83,13 @@ Backend:
 
 Default local infra values used by the validation scripts:
 
-- PostgreSQL: `postgresql://pdfextract:pdfextract@localhost:54329/pdfextract`
+- PostgreSQL: `postgresql+psycopg://pdfextract:pdfextract@localhost:54329/pdfextract`
 - MinIO API: `http://localhost:9000`
 - MinIO console: `http://localhost:9001`
 - Kafka bootstrap servers: `localhost:9092`
 - MinIO bucket: `pdfextract-local`
+- Gemini mock mode: `true`
+- Admin allowlist default: `admin@example.com`
 - Prefixes:
   - `receiving/{user_id}/{job_id}/source.pdf`
   - `processed/{user_id}/{job_id}/output.xlsx`
@@ -123,15 +127,22 @@ Stop infrastructure:
 ./scripts/stop-local-infra.ps1
 ```
 
-## Backend Surface in This Phase
+## Backend Surface
 
-Only the minimal Phase 0/1 smoke surface exists:
+The backend API surface is now:
 
 - `GET /api/health`
 - `GET /api/ready`
 - `GET /api/me`
+- `POST /api/uploads`
+- `GET /api/jobs`
+- `GET /api/jobs/{job_id}`
+- `GET /api/jobs/{job_id}/download`
+- `GET /api/admin/jobs`
+- `GET /api/admin/jobs/{job_id}`
+- `POST /api/admin/jobs/{job_id}/retry`
 
-The backend CLI used by validation scripts is:
+The backend CLI kept for local checks is:
 
 ```powershell
 python -m app.cli check-db
@@ -142,14 +153,20 @@ python -m app.cli smoke-firebase
 python -m app.cli smoke-http
 ```
 
-## Frontend Surface in This Phase
+## Frontend Surface
 
-The frontend is intentionally minimal:
+The approved routes are implemented:
 
-- `/` redirects to `/login`
-- `/login` is a truthful foundation screen, not a marketing page
-- Firebase public config loading and browser-side initialization path are real
-- no fake upload/jobs/product-complete UI is exposed
+- `/`
+- `/login`
+- `/dashboard`
+- `/upload`
+- `/jobs`
+- `/jobs/[jobId]`
+- `/admin/jobs`
+- `/admin/jobs/[jobId]`
+
+The frontend remains Vercel-safe with `frontend/` as the project root, but it now points to the real backend contract rather than scaffold-only placeholders.
 
 ## Vercel Compatibility
 

@@ -1,31 +1,122 @@
-from .database_service import check_database_connection
+from .auth_service import (
+    AuthenticatedContext,
+    authenticate_request,
+    get_authenticated_claims,
+    get_authenticated_user,
+    get_bearer_token_from_request,
+    initialize_auth,
+    require_admin,
+    require_auth,
+)
+from .database_service import check_database_connection, ping_postgres
+from .download_service import resolve_download_artifact
+from .excel_service import generate_excel_workbook
+from .extraction_service import (
+    ExtractionPayload,
+    extract_document_data,
+    normalize_extraction_output,
+)
 from .firebase_service import (
     firebase_status,
     initialize_firebase_app,
     verify_bearer_token,
     verify_token,
 )
-from .kafka_service import REQUIRED_TOPICS, check_kafka_connection, ensure_topics
+from .job_service import (
+    get_admin_job_payload,
+    get_retry_eligibility,
+    get_user_job_payload,
+    list_admin_job_payloads,
+    list_user_job_payloads,
+    retry_job,
+    serialize_job_detail,
+    serialize_job_summary,
+)
+from .kafka_service import (
+    REQUIRED_TOPICS,
+    KafkaJobEvent,
+    build_job_event,
+    check_kafka_connection,
+    consume_single_event,
+    ensure_topics,
+    ping_kafka,
+    publish_retry_event,
+    publish_submit_event,
+)
+from .pdf_reader_service import PreparedPdf, classify_document_type, read_pdf_document
 from .storage_service import (
     build_processed_key,
     build_source_key,
     canonical_storage_prefixes,
     check_storage_connection,
+    delete_object,
     ensure_bucket_and_prefixes,
+    get_object_bytes,
+    object_exists,
+    ping_storage,
+    put_object_bytes,
+    stream_object,
 )
+from .upload_service import submit_upload, validate_pdf_upload
+from .validation_service import ValidationResult, validate_normalized_output
+from .worker_service import WorkerExecutionResult, normalize_worker_payload, process_worker_event
 
 __all__ = [
+    "ExtractionPayload",
+    "AuthenticatedContext",
+    "KafkaJobEvent",
+    "PreparedPdf",
     "REQUIRED_TOPICS",
+    "ValidationResult",
+    "WorkerExecutionResult",
+    "authenticate_request",
     "build_processed_key",
+    "build_job_event",
     "build_source_key",
     "check_database_connection",
     "check_kafka_connection",
     "check_storage_connection",
+    "classify_document_type",
     "canonical_storage_prefixes",
+    "consume_single_event",
+    "delete_object",
     "ensure_bucket_and_prefixes",
     "ensure_topics",
+    "extract_document_data",
     "firebase_status",
+    "generate_excel_workbook",
+    "get_admin_job_payload",
+    "get_authenticated_claims",
+    "get_authenticated_user",
+    "get_bearer_token_from_request",
+    "get_object_bytes",
+    "get_retry_eligibility",
+    "get_user_job_payload",
+    "initialize_auth",
     "initialize_firebase_app",
+    "list_admin_job_payloads",
+    "list_user_job_payloads",
+    "normalize_extraction_output",
+    "normalize_worker_payload",
+    "object_exists",
+    "ping_kafka",
+    "ping_postgres",
+    "ping_storage",
+    "process_worker_event",
+    "publish_retry_event",
+    "publish_submit_event",
+    "put_object_bytes",
+    "read_pdf_document",
+    "require_admin",
+    "require_auth",
+    "resolve_download_artifact",
+    "retry_job",
+    "serialize_job_detail",
+    "serialize_job_summary",
+    "stream_object",
+    "submit_upload",
+    "validate_normalized_output",
+    "validate_pdf_upload",
     "verify_bearer_token",
     "verify_token",
 ]
