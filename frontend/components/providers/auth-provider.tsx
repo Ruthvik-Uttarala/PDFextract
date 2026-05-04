@@ -16,7 +16,7 @@ import {
 } from "firebase/auth";
 
 import { getCurrentUser } from "@/lib/api/client";
-import { getFirebaseClientConfigStatus } from "@/lib/env";
+import { getApiBaseUrlStatus, getFirebaseClientConfigStatus } from "@/lib/env";
 import { createGoogleProvider, getFirebaseAuth } from "@/lib/firebase/client";
 import type { UserProfile } from "@/lib/types";
 
@@ -44,10 +44,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    const status = getFirebaseClientConfigStatus();
-    if (!status.ready) {
+    const firebaseStatus = getFirebaseClientConfigStatus();
+    const apiStatus = getApiBaseUrlStatus();
+    const missingKeys = [...firebaseStatus.missingKeys, ...apiStatus.missingKeys];
+    if (missingKeys.length > 0) {
       setPhase("config-missing");
-      setMissingKeys(status.missingKeys);
+      setMissingKeys(missingKeys);
       return () => undefined;
     }
 

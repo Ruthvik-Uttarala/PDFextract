@@ -23,6 +23,14 @@ export type FirebaseClientConfigStatus = Readonly<{
   config: FirebaseClientConfig | null;
 }>;
 
+export type ApiBaseUrlStatus = Readonly<{
+  ready: boolean;
+  missingKeys: string[];
+  baseUrl: string | null;
+}>;
+
+const localApiFallback = "http://127.0.0.1:8000";
+
 export function getFirebaseClientConfigStatus(): FirebaseClientConfigStatus {
   const missingKeys = Object.values(requiredFirebaseKeys).filter((envKey) => !process.env[envKey]);
   const ready = missingKeys.length === 0;
@@ -44,6 +52,35 @@ export function getFirebaseClientConfigStatus(): FirebaseClientConfigStatus {
   };
 }
 
+export function getApiBaseUrlStatus(): ApiBaseUrlStatus {
+  const configuredBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+  if (configuredBaseUrl) {
+    return {
+      ready: true,
+      missingKeys: [],
+      baseUrl: configuredBaseUrl.replace(/\/$/, "")
+    };
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    return {
+      ready: false,
+      missingKeys: ["NEXT_PUBLIC_API_BASE_URL"],
+      baseUrl: null
+    };
+  }
+
+  return {
+    ready: true,
+    missingKeys: [],
+    baseUrl: localApiFallback
+  };
+}
+
 export function getApiBaseUrl(): string {
-  return (process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
+  const status = getApiBaseUrlStatus();
+  if (!status.ready || !status.baseUrl) {
+    throw new Error(`Missing API public environment variables: ${status.missingKeys.join(", ")}`);
+  }
+  return status.baseUrl;
 }
