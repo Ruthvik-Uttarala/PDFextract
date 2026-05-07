@@ -1,10 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { useAuth } from "@/components/providers/auth-provider";
 import { uploadPdf } from "@/lib/api/client";
+
+type ExtractionOption = "text" | "tables" | "ocr";
 
 export default function UploadPage() {
   const auth = useAuth();
@@ -12,6 +14,18 @@ export default function UploadPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [options, setOptions] = useState<Record<ExtractionOption, boolean>>({
+    text: true,
+    tables: true,
+    ocr: false,
+  });
+
+  const selectedFileSizeLabel = useMemo(() => {
+    if (!selectedFile) {
+      return "";
+    }
+    return `${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB`;
+  }, [selectedFile]);
 
   function handleFileSelection(file: File | null): void {
     if (!file) {
@@ -21,6 +35,12 @@ export default function UploadPage() {
 
     if (!file.name.toLowerCase().endsWith(".pdf")) {
       setMessage("Only PDF uploads are supported.");
+      setSelectedFile(null);
+      return;
+    }
+
+    if (file.size <= 0) {
+      setMessage("The selected PDF appears to be empty.");
       setSelectedFile(null);
       return;
     }
@@ -52,28 +72,23 @@ export default function UploadPage() {
     }
   }
 
+  function toggleOption(option: ExtractionOption): void {
+    setOptions((current) => ({
+      ...current,
+      [option]: !current[option],
+    }));
+  }
+
   return (
-    <section className="single-column-page">
-      <header className="page-header">
-        <div>
-          <p className="page-header__eyebrow">Upload</p>
-          <h2 className="page-header__title">Create a new document job</h2>
-          <p className="page-header__body">
-            Upload one PDF. The backend stores it, creates a job, and hands processing to the async pipeline.
-          </p>
-        </div>
+    <section className="workspace-page">
+      <header className="workspace-page__header">
+        <h1>Extract data from your PDF</h1>
+        <p>Upload a PDF file and extract text, tables, and images with ease.</p>
       </header>
 
-      <section className="card">
-        <div className="section-header">
-          <div>
-            <p className="section-header__eyebrow">Source file</p>
-            <h3 className="section-header__title">One PDF only</h3>
-          </div>
-        </div>
-
+      <section className="upload-card">
         <label
-          className="upload-dropzone"
+          className="upload-zone"
           onDragOver={(event) => event.preventDefault()}
           onDrop={(event) => {
             event.preventDefault();
@@ -86,28 +101,71 @@ export default function UploadPage() {
             onChange={(event) => handleFileSelection(event.target.files?.item(0) || null)}
             className="visually-hidden"
           />
-          <strong>{selectedFile ? selectedFile.name : "Drop a PDF here or browse from your device"}</strong>
-          <span>Accepted format: one `.pdf` file per job.</span>
+
+          <span className="upload-zone__icon">↑</span>
+          <p className="upload-zone__title">Drag &amp; Drop your PDF here</p>
+          <p className="upload-zone__subtle">or</p>
+          <span className="button button--primary button--small">Upload PDF</span>
         </label>
 
-        <div className="meta-grid">
-          <div className="meta-card">
-            <span className="meta-card__label">Selected file</span>
-            <strong>{selectedFile ? selectedFile.name : "None selected"}</strong>
+        {selectedFile ? (
+          <div className="upload-selected-file">
+            <div>
+              <p className="upload-selected-file__name">{selectedFile.name}</p>
+              <p className="upload-selected-file__size">{selectedFileSizeLabel}</p>
+            </div>
+            <button
+              type="button"
+              className="upload-selected-file__remove"
+              onClick={() => setSelectedFile(null)}
+              aria-label="Remove selected file"
+            >
+              ×
+            </button>
           </div>
-          <div className="meta-card">
-            <span className="meta-card__label">What happens next</span>
-            <strong>Stored, queued, then processed asynchronously</strong>
-          </div>
+        ) : null}
+
+        <div className="upload-options">
+          <label className="upload-option">
+            <input
+              type="checkbox"
+              checked={options.text}
+              onChange={() => toggleOption("text")}
+            />
+            <div>
+              <p>Extract Text</p>
+              <span>Extract readable text from PDF</span>
+            </div>
+          </label>
+          <label className="upload-option">
+            <input
+              type="checkbox"
+              checked={options.tables}
+              onChange={() => toggleOption("tables")}
+            />
+            <div>
+              <p>Extract Tables</p>
+              <span>Extract tables in CSV format</span>
+            </div>
+          </label>
+          <label className="upload-option">
+            <input
+              type="checkbox"
+              checked={options.ocr}
+              onChange={() => toggleOption("ocr")}
+            />
+            <div>
+              <p>OCR (Scanned PDF)</p>
+              <span>Extract text from scanned PDFs</span>
+            </div>
+          </label>
         </div>
 
         {message ? <div className="notice notice--error">{message}</div> : null}
 
-        <div className="button-row">
-          <button className="button button--primary" disabled={submitting} onClick={() => void handleSubmit()}>
-            {submitting ? "Uploading..." : "Upload PDF"}
-          </button>
-        </div>
+        <button className="button button--primary button--wide" disabled={submitting} onClick={() => void handleSubmit()}>
+          {submitting ? "Uploading..." : "Extract Now"}
+        </button>
       </section>
     </section>
   );

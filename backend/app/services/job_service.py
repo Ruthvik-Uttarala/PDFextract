@@ -22,6 +22,7 @@ from app.db.repositories import (
     get_job,
     get_job_for_user,
     get_latest_attempt_number,
+    get_latest_extraction_result_for_job,
     list_admin_actions_for_job,
     list_jobs_for_admin,
     list_jobs_for_user,
@@ -180,6 +181,7 @@ def serialize_job_detail(
     payload = serialize_job_summary(session, job, include_owner=include_admin)
     payload["timeline"] = _build_timeline(job)
     payload["download_available"] = get_job_artifact_info(session, job).available
+    payload["extraction"] = _build_extraction_preview(session, job=job)
 
     if include_admin:
         attempts = list_processing_attempts_for_job(session, job_id=job.id)
@@ -218,6 +220,134 @@ def serialize_job_detail(
         payload["retry"] = get_retry_eligibility(session, settings=settings, job=job)
 
     return payload
+
+
+def _build_extraction_preview(session: Session, *, job: Job) -> dict[str, object] | None:
+    result = get_latest_extraction_result_for_job(session, job_id=job.id)
+    if result is None:
+        return None
+
+    normalized_json = result.normalized_json if isinstance(result.normalized_json, dict) else None
+    extracted_json = result.extracted_json if isinstance(result.extracted_json, dict) else {}
+
+    return {
+        "schema_version": result.schema_version,
+        "document_type": result.document_type,
+        "text_preview": _build_extraction_text_preview(normalized_json, extracted_json),
+        "tables": _build_extraction_tables_preview(normalized_json),
+        "images": [],
+        "normalized_json": normalized_json,
+        "extracted_json": extracted_json,
+        "validation_passed": result.validation_passed,
+        "validation_errors": result.validation_errors or [],
+    }
+
+
+def _build_extraction_text_preview(
+    normalized_json: dict[str, object] | None,
+    extracted_json: dict[str, object],
+) -> str:
+    if normalized_json and normalized_json.get("document_type") == "invoice":
+        vendor_raw = normalized_json.get("vendor")
+        vendor_name = vendor_raw.get("name") if isinstance(vendor_raw, dict) else None
+        invoice_number = normalized_json.get("invoice_number")
+        invoice_date = normalized_json.get("invoice_date")
+        due_date = normalized_json.get("due_date")
+        total_amount = normalized_json.get("total_amount")
+        currency = normalized_json.get("currency") or "USD"
+        line_items_raw = normalized_json.get("line_items")
+        line_items = line_items_raw if isinstance(line_items_raw, list) else []
+
+        lines = [
+            "Invoice extraction summary",
+            f"Vendor: {vendor_name or 'Unknown'}",
+            f"Invoice Number: {invoice_number or 'Unknown'}",
+            f"Invoice Date: {invoice_date or 'Unknown'}",
+            f"Due Date: {due_date or 'Unknown'}",
+            f"Total Amount: {total_amount or 'Unknown'} {currency}",
+            "",
+            "Line items:",
+        ]
+        for item in line_items:
+            if not isinstance(item, dict):
+                continue
+            description = item.get("description") or "Item"
+            quantity = item.get("quantity") or "-"
+            unit_price = item.get("unit_price") or "-"
+            line_total = item.get("line_total") or "-"
+            lines.append(f"- {description}: qty {quantity}, unit {unit_price}, total {line_total}")
+        return "\n".join(lines).strip()
+
+    if normalized_json and normalized_json.get("document_type") == "research_report":
+        title = normalized_json.get("title") or "Untitled report"
+        authors = normalized_json.get("authors")
+        sections = normalized_json.get("sections")
+        lines = [f"Title: {title}"]
+        if isinstance(authors, list) and authors:
+            lines.append(f"Authors: {', '.join(str(author) for author in authors)}")
+        if isinstance(sections, list):
+            lines.append("")
+            for section in sections:
+                if not isinstance(section, dict):
+                    continue
+                heading = section.get("heading") or "Section"
+                content = section.get("content") or ""
+                lines.append(f"{heading}\n{content}".strip())
+        return "\n\n".join(lines).strip()
+
+    return str(extracted_json)
+
+
+def _build_extraction_tables_preview(
+    normalized_json: dict[str, object] | None,
+) -> list[dict[str, object]]:
+    if not isinstance(normalized_json, dict):
+        return []
+
+    if normalized_json.get("document_type") == "invoice":
+        line_items = normalized_json.get("line_items")
+        if not isinstance(line_items, list):
+            return []
+        rows: list[list[str]] = []
+        for item in line_items:
+            if not isinstance(item, dict):
+                continue
+            rows.append(
+                [
+                    str(item.get("description") or ""),
+                    str(item.get("quantity") or ""),
+                    str(item.get("unit_price") or ""),
+                    str(item.get("line_total") or ""),
+                ]
+            )
+        return [
+            {
+                "name": "Line Items",
+                "columns": ["Description", "Quantity", "Unit Price", "Line Total"],
+                "rows": rows,
+            }
+        ]
+
+    if normalized_json.get("document_type") == "research_report":
+        sections = normalized_json.get("sections")
+        if not isinstance(sections, list):
+            return []
+        section_rows: list[list[str]] = []
+        for section in sections:
+            if not isinstance(section, dict):
+                continue
+            section_rows.append(
+                [str(section.get("heading") or ""), str(section.get("content") or "")]
+            )
+        return [
+            {
+                "name": "Sections",
+                "columns": ["Heading", "Content"],
+                "rows": section_rows,
+            }
+        ]
+
+    return []
 
 
 def get_retry_eligibility(

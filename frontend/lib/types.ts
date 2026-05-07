@@ -33,6 +33,32 @@ export type JobSummary = {
 export type JobDetail = JobSummary & {
   timeline: JobTimelineItem[];
   download_available: boolean;
+  extraction: JobExtraction | null;
+};
+
+export type ExtractionTable = {
+  name: string;
+  columns: string[];
+  rows: string[][];
+};
+
+export type ExtractionImage = {
+  id: string;
+  name: string;
+  size_label: string;
+  preview_url: string;
+};
+
+export type JobExtraction = {
+  schema_version: string;
+  document_type: string | null;
+  text_preview: string;
+  tables: ExtractionTable[];
+  images: ExtractionImage[];
+  normalized_json: Record<string, unknown> | null;
+  extracted_json: Record<string, unknown>;
+  validation_passed: boolean;
+  validation_errors: Array<Record<string, unknown>>;
 };
 
 export type ProcessingAttempt = {

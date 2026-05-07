@@ -61,7 +61,7 @@ describe("JobDetailPage", () => {
     const user = userEvent.setup();
 
     render(<JobDetailPage params={{ jobId: "job-1" }} />);
-    await user.click(screen.getByRole("button", { name: "Download Excel" }));
+    await user.click(screen.getByRole("button", { name: "Download All" }));
 
     expect(downloadJobOutput).toHaveBeenCalledWith("user-token", "job-1");
     expect(triggerBrowserDownload).toHaveBeenCalled();

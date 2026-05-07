@@ -14,7 +14,11 @@ from .attempts import (
     mark_attempt_succeeded,
     start_processing_attempt,
 )
-from .extraction_results import create_extraction_result, get_extraction_result_for_attempt
+from .extraction_results import (
+    create_extraction_result,
+    get_extraction_result_for_attempt,
+    get_latest_extraction_result_for_job,
+)
 from .files import (
     create_file_record,
     get_file_record,
@@ -43,6 +47,7 @@ __all__ = [
     "create_processing_attempt",
     "get_current_output_artifact",
     "get_extraction_result_for_attempt",
+    "get_latest_extraction_result_for_job",
     "get_file_record",
     "get_file_record_by_role",
     "get_job",

@@ -6,13 +6,36 @@ import { useEffect } from "react";
 
 import { useAuth } from "@/components/providers/auth-provider";
 
-const primaryNav = [
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/upload", label: "Upload" },
-  { href: "/jobs", label: "Jobs" }
-] as const;
+type NavigationItem = {
+  href: string;
+  label: string;
+  icon: string;
+  available: boolean;
+};
 
-export function AppShell({ children, requiresAdmin = false }: { children: React.ReactNode; requiresAdmin?: boolean }) {
+function buildNavigationItems(isAdmin: boolean): NavigationItem[] {
+  const items: NavigationItem[] = [
+    { href: "/upload", label: "Upload", icon: "U", available: true },
+    { href: "/jobs", label: "My Files", icon: "F", available: true },
+    { href: "/dashboard", label: "History", icon: "H", available: true },
+    { href: "#", label: "Settings", icon: "S", available: false },
+    { href: "#", label: "Help", icon: "?", available: false },
+  ];
+
+  if (isAdmin) {
+    items.push({ href: "/admin/jobs", label: "Admin", icon: "A", available: true });
+  }
+
+  return items;
+}
+
+export function AppShell({
+  children,
+  requiresAdmin = false,
+}: {
+  children: React.ReactNode;
+  requiresAdmin?: boolean;
+}) {
   const auth = useAuth();
   const pathname = usePathname();
   const router = useRouter();
@@ -23,11 +46,7 @@ export function AppShell({ children, requiresAdmin = false }: { children: React.
       return;
     }
 
-    if (
-      auth.phase === "authenticated" &&
-      requiresAdmin &&
-      auth.backendUser?.role !== "admin"
-    ) {
+    if (auth.phase === "authenticated" && requiresAdmin && auth.backendUser?.role !== "admin") {
       router.replace("/dashboard");
     }
   }, [auth.backendUser?.role, auth.phase, requiresAdmin, router]);
@@ -39,7 +58,7 @@ export function AppShell({ children, requiresAdmin = false }: { children: React.
   if (auth.phase === "config-missing") {
     return (
       <AuthStateScreen
-        title="Firebase configuration missing"
+        title="Configuration missing"
         body={`Missing public keys: ${auth.missingKeys.join(", ")}`}
       />
     );
@@ -67,45 +86,59 @@ export function AppShell({ children, requiresAdmin = false }: { children: React.
     return <AuthStateScreen title="Admin access only" body="This route is limited to operators." />;
   }
 
+  const navigationItems = buildNavigationItems(auth.backendUser.role === "admin");
+
   return (
-    <div className="app-shell">
-      <header className="app-header">
-        <div>
-          <p className="app-header__eyebrow">PDFextract</p>
-          <h1 className="app-header__title">Document processing workspace</h1>
-        </div>
-        <div className="app-header__actions">
-          <div className="user-chip">
-            <span>{auth.backendUser.display_name || auth.backendUser.email || "User"}</span>
-            <span className="user-chip__role">{auth.backendUser.role}</span>
+    <div className="workspace-shell">
+      <aside className="workspace-sidebar" aria-label="Main sidebar">
+        <div className="workspace-brand">
+          <span className="workspace-brand__icon">P</span>
+          <div>
+            <p className="workspace-brand__title">PDF Extract</p>
+            <p className="workspace-brand__subtitle">Utility</p>
           </div>
-          <button className="button button--secondary" onClick={() => void auth.signOutUser()}>
+        </div>
+
+        <nav className="workspace-nav">
+          {navigationItems.map((item) => {
+            if (!item.available) {
+              return (
+                <span key={item.label} className="workspace-nav__item is-disabled">
+                  <span className="workspace-nav__icon">{item.icon}</span>
+                  <span>{item.label}</span>
+                </span>
+              );
+            }
+
+            const isActive = item.href !== "#" && pathname?.startsWith(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={isActive ? "workspace-nav__item is-active" : "workspace-nav__item"}
+              >
+                <span className="workspace-nav__icon">{item.icon}</span>
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="workspace-user">
+          <div className="workspace-user__avatar">
+            {(auth.backendUser.display_name || auth.backendUser.email || "U").slice(0, 1).toUpperCase()}
+          </div>
+          <div className="workspace-user__details">
+            <p>{auth.backendUser.display_name || "Signed-in user"}</p>
+            <span>{auth.backendUser.email || "No email available"}</span>
+          </div>
+          <button className="button button--ghost button--small" onClick={() => void auth.signOutUser()}>
             Sign out
           </button>
         </div>
-      </header>
+      </aside>
 
-      <nav className="primary-nav" aria-label="Primary">
-        {primaryNav.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={pathname?.startsWith(item.href) ? "primary-nav__link is-active" : "primary-nav__link"}
-          >
-            {item.label}
-          </Link>
-        ))}
-        {auth.backendUser.role === "admin" ? (
-          <Link
-            href="/admin/jobs"
-            className={pathname?.startsWith("/admin/jobs") ? "primary-nav__link is-active" : "primary-nav__link"}
-          >
-            Admin
-          </Link>
-        ) : null}
-      </nav>
-
-      <main className="page-shell">{children}</main>
+      <main className="workspace-content">{children}</main>
     </div>
   );
 }
@@ -113,7 +146,7 @@ export function AppShell({ children, requiresAdmin = false }: { children: React.
 function AuthStateScreen({
   title,
   body,
-  action
+  action,
 }: {
   title: string;
   body: string;

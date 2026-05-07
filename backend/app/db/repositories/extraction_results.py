@@ -43,3 +43,16 @@ def get_extraction_result_for_attempt(
             ExtractionResult.processing_attempt_id == processing_attempt_id
         )
     ).scalar_one_or_none()
+
+
+def get_latest_extraction_result_for_job(
+    session: Session,
+    *,
+    job_id: str,
+) -> ExtractionResult | None:
+    return session.execute(
+        select(ExtractionResult)
+        .where(ExtractionResult.job_id == job_id)
+        .order_by(ExtractionResult.created_at.desc())
+        .limit(1)
+    ).scalar_one_or_none()
