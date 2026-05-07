@@ -1,24 +1,20 @@
 from __future__ import annotations
 
-from psycopg import connect
+from sqlalchemy import text
 
 from app.core import Settings
+from app.db import get_engine, ping_database
 
 
-def check_database_connection(settings: Settings) -> dict[str, str | int]:
-    with connect(settings.database_url, connect_timeout=5) as connection:
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT current_database(), version()")
-            row = cursor.fetchone()
-            if row is None:
-                raise RuntimeError("PostgreSQL did not return a version row.")
-            database_name, version = row
-
+def check_database_connection(settings: Settings) -> dict[str, str]:
+    ping_database(settings)
+    with get_engine(settings).connect() as connection:
+        row = connection.execute(text("SELECT current_database(), version()")).one()
     return {
-        "database": str(database_name),
-        "version": str(version).split(",")[0],
+        "database": str(row[0]),
+        "version": str(row[1]).split(",")[0],
     }
 
 
-def ping_postgres(settings: Settings) -> dict[str, str | int]:
+def ping_postgres(settings: Settings) -> dict[str, str]:
     return check_database_connection(settings)

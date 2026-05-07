@@ -1,24 +1,17 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
-
-from sqlalchemy import DateTime, Integer, String
+from sqlalchemy import Boolean, String
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.base import Base
+from app.core.constants import UserRole
+from app.db.base import Base, PrimaryKeyMixin, UpdatedTimestampMixin
 
 
-class User(Base):
+class User(PrimaryKeyMixin, UpdatedTimestampMixin, Base):
     __tablename__ = "users"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     firebase_uid: Mapped[str] = mapped_column(String(128), nullable=False, unique=True, index=True)
-    email: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(320), nullable=True, index=True)
     display_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    role: Mapped[str] = mapped_column(String(32), nullable=False, default="user")
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
-    )
+    role: Mapped[str] = mapped_column(String(32), nullable=False, default=UserRole.USER)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)

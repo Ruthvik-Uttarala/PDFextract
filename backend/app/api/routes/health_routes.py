@@ -2,29 +2,30 @@ from __future__ import annotations
 
 from typing import Any
 
-from flask import Blueprint, current_app, jsonify
+from flask import Blueprint, jsonify
 
-from app.core.config import Settings, get_settings
+from app.api.request_context import get_settings_from_app
 from app.services import database_service, kafka_service, storage_service
 
 health_blueprint = Blueprint("health_routes", __name__)
 
 
-def _settings() -> Settings:
-    settings = current_app.extensions.get("pdfextract_settings")
-    if isinstance(settings, Settings):
-        return settings
-    return get_settings()
-
-
 @health_blueprint.get("/api/health")
 def health() -> Any:
-    return ({"service": "pdfextract-backend", "status": "ok"}, 200)
+    return (
+        jsonify(
+            {
+                "service": "pdfextract-backend",
+                "status": "ok",
+            }
+        ),
+        200,
+    )
 
 
 @health_blueprint.get("/api/ready")
 def ready() -> Any:
-    settings = _settings()
+    settings = get_settings_from_app()
     checks: dict[str, dict[str, object]] = {}
     failures = False
 
@@ -35,7 +36,7 @@ def ready() -> Any:
     ):
         try:
             checks[name] = {"ok": True, "details": checker(settings)}
-        except Exception as error:  # pragma: no cover - surfaced in smoke validation
+        except Exception as error:  # pragma: no cover - surfaced by readiness checks
             failures = True
             checks[name] = {"ok": False, "details": str(error)}
 

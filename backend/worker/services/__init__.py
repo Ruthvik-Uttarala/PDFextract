@@ -1,1 +1,3 @@
-"""Worker service placeholders for later phases."""
+from .local_runner import run_local_worker
+
+__all__ = ["run_local_worker"]
