@@ -1,19 +1,24 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import { useAuth } from "@/components/providers/auth-provider";
 import { uploadPdf } from "@/lib/api/client";
 
 type ExtractionOption = "text" | "tables" | "ocr";
 
+const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+const ALLOWED_MIME_TYPES = new Set(["application/pdf", "application/x-pdf"]);
+
 export default function UploadPage() {
   const auth = useAuth();
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
   const [options, setOptions] = useState<Record<ExtractionOption, boolean>>({
     text: true,
     tables: true,
@@ -39,8 +44,20 @@ export default function UploadPage() {
       return;
     }
 
+    if (file.type && !ALLOWED_MIME_TYPES.has(file.type.toLowerCase())) {
+      setMessage("The selected file is not a supported PDF.");
+      setSelectedFile(null);
+      return;
+    }
+
     if (file.size <= 0) {
       setMessage("The selected PDF appears to be empty.");
+      setSelectedFile(null);
+      return;
+    }
+
+    if (file.size > MAX_UPLOAD_BYTES) {
+      setMessage("The selected PDF exceeds the 25 MB upload limit.");
       setSelectedFile(null);
       return;
     }
@@ -87,17 +104,34 @@ export default function UploadPage() {
       </header>
 
       <section className="upload-card">
-        <label
-          className="upload-zone"
+        <div
+          className={[
+            "upload-zone",
+            dragging ? "is-dragging" : "",
+            selectedFile ? "is-selected" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+          onDragEnter={(event) => {
+            event.preventDefault();
+            setDragging(true);
+          }}
           onDragOver={(event) => event.preventDefault()}
+          onDragLeave={(event) => {
+            event.preventDefault();
+            setDragging(false);
+          }}
           onDrop={(event) => {
             event.preventDefault();
+            setDragging(false);
             handleFileSelection(event.dataTransfer.files.item(0));
           }}
         >
           <input
+            ref={fileInputRef}
             type="file"
             accept="application/pdf,.pdf"
+            aria-label="Drag & Drop your PDF here"
             onChange={(event) => handleFileSelection(event.target.files?.item(0) || null)}
             className="visually-hidden"
           />
@@ -105,14 +139,25 @@ export default function UploadPage() {
           <span className="upload-zone__icon">↑</span>
           <p className="upload-zone__title">Drag &amp; Drop your PDF here</p>
           <p className="upload-zone__subtle">or</p>
-          <span className="button button--primary button--small">Upload PDF</span>
-        </label>
+          <button
+            type="button"
+            className="button button--primary button--small"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            Upload PDF
+          </button>
+        </div>
 
         {selectedFile ? (
           <div className="upload-selected-file">
-            <div>
-              <p className="upload-selected-file__name">{selectedFile.name}</p>
-              <p className="upload-selected-file__size">{selectedFileSizeLabel}</p>
+            <div className="upload-selected-file__meta">
+              <span className="upload-selected-file__icon" aria-hidden="true">
+                PDF
+              </span>
+              <div>
+                <p className="upload-selected-file__name">{selectedFile.name}</p>
+                <p className="upload-selected-file__size">{selectedFileSizeLabel}</p>
+              </div>
             </div>
             <button
               type="button"
@@ -163,8 +208,12 @@ export default function UploadPage() {
 
         {message ? <div className="notice notice--error">{message}</div> : null}
 
-        <button className="button button--primary button--wide" disabled={submitting} onClick={() => void handleSubmit()}>
-          {submitting ? "Uploading..." : "Extract Now"}
+        <button
+          className="button button--primary button--wide"
+          disabled={submitting || !selectedFile}
+          onClick={() => void handleSubmit()}
+        >
+          {submitting ? "Uploading..." : "Extract Now →"}
         </button>
       </section>
     </section>

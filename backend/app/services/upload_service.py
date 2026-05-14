@@ -25,7 +25,10 @@ def submit_upload(
     uploaded_file: FileStorage | None,
     correlation_id: str,
 ) -> dict[str, Any]:
-    file_bytes, original_filename, content_type = validate_pdf_upload(uploaded_file)
+    file_bytes, original_filename, content_type = validate_pdf_upload(
+        uploaded_file,
+        max_size_bytes=settings.upload_max_pdf_bytes,
+    )
     job = create_job(session, user_id=user.id, source_filename=original_filename)
 
     source_key = build_source_key(settings, user.id, job.id)
@@ -100,7 +103,11 @@ def submit_upload(
     return serialize_job_summary(session, job)
 
 
-def validate_pdf_upload(uploaded_file: FileStorage | None) -> tuple[bytes, str, str]:
+def validate_pdf_upload(
+    uploaded_file: FileStorage | None,
+    *,
+    max_size_bytes: int,
+) -> tuple[bytes, str, str]:
     if uploaded_file is None:
         raise ApiError(
             code=FailureCode.UPLOAD_MISSING,
@@ -141,6 +148,14 @@ def validate_pdf_upload(uploaded_file: FileStorage | None) -> tuple[bytes, str, 
             code=FailureCode.UPLOAD_EMPTY,
             message="The uploaded PDF is empty.",
             status_code=HTTPStatus.BAD_REQUEST,
+        )
+
+    if len(file_bytes) > max_size_bytes:
+        raise ApiError(
+            code=FailureCode.UPLOAD_TOO_LARGE,
+            message="The uploaded PDF exceeds the allowed size.",
+            status_code=HTTPStatus.BAD_REQUEST,
+            details={"max_size_bytes": max_size_bytes},
         )
 
     if not file_bytes.startswith(b"%PDF"):

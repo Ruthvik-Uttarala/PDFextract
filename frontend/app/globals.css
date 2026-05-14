@@ -899,6 +899,21 @@ button:disabled {
   background: #fafdff;
 }
 
+.upload-zone:hover,
+.upload-zone:focus-within {
+  border-color: #8eb4f3;
+  background: #f3f9ff;
+}
+
+.upload-zone.is-dragging {
+  border-color: #1d67e8;
+  background: #eef5ff;
+}
+
+.upload-zone.is-selected {
+  border-color: #9ec0f6;
+}
+
 .upload-zone__icon {
   width: 40px;
   height: 40px;
@@ -932,6 +947,26 @@ button:disabled {
   padding: 12px 14px;
   border: 1px solid #e3e8f2;
   border-radius: 11px;
+}
+
+.upload-selected-file__meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.upload-selected-file__icon {
+  min-width: 38px;
+  min-height: 26px;
+  border-radius: 8px;
+  background: #e95151;
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 10px;
 }
 
 .upload-selected-file__name,
@@ -1003,6 +1038,11 @@ button:disabled {
   font-weight: 700;
 }
 
+.processing-file span {
+  color: #70819a;
+  font-size: 0.9rem;
+}
+
 .processing-steps {
   list-style: none;
   margin: 0;
@@ -1016,6 +1056,7 @@ button:disabled {
   display: flex;
   justify-content: space-between;
   gap: 10px;
+  align-items: center;
 }
 
 .processing-state {
@@ -1032,6 +1073,42 @@ button:disabled {
 }
 
 .processing-state.is-failed {
+  color: #c44a4a;
+}
+
+.processing-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.processing-step__indicator {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #cbd9ee;
+  color: #8ba0bc;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.processing-step__indicator.is-completed {
+  background: #16a05d;
+  border-color: #16a05d;
+  color: #ffffff;
+}
+
+.processing-step__indicator.is-current {
+  color: #1d67e8;
+  border-color: #7dacfb;
+  animation: spin 1s linear infinite;
+}
+
+.processing-step__indicator.is-failed {
+  border-color: #de8f8f;
   color: #c44a4a;
 }
 
@@ -1052,6 +1129,16 @@ button:disabled {
 .processing-progress__bar {
   height: 100%;
   background: linear-gradient(90deg, #1d67e8, #2f8dff);
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .results-shell {

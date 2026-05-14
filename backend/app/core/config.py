@@ -43,6 +43,7 @@ class Settings:
     download_chunk_size: int = 65536
     api_base_url: str = "http://127.0.0.1:8000"
     cors_allowed_origins: str = "http://127.0.0.1:3000,http://localhost:3000"
+    upload_max_pdf_bytes: int = 26214400
 
     @property
     def firebase_emulator_host(self) -> str:
@@ -140,6 +141,10 @@ class Settings:
                 cls.cors_allowed_origins,
             )
             or cls.cors_allowed_origins,
+            upload_max_pdf_bytes=_read_int(
+                os.getenv("UPLOAD_MAX_PDF_BYTES"),
+                default=cls.upload_max_pdf_bytes,
+            ),
         )
 
 

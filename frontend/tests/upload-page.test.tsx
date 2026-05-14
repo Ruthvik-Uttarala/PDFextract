@@ -43,7 +43,7 @@ describe("UploadPage", () => {
     render(<UploadPage />);
 
     await user.upload(screen.getByLabelText(/drag & drop your pdf here/i), file);
-    await user.click(screen.getByRole("button", { name: "Extract Now" }));
+    await user.click(screen.getByRole("button", { name: /Extract Now/i }));
 
     expect(uploadPdf).toHaveBeenCalledWith("user-token", file);
     expect(push).toHaveBeenCalledWith("/jobs/job-123");
