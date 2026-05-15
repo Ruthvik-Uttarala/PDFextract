@@ -11,13 +11,7 @@ import type { JobSummary } from "@/lib/types";
 export default function AdminJobsPage() {
   const auth = useAuth();
 
-  const loadJobs = useCallback(async (): Promise<JobSummary[]> => {
-    const token = await auth.getAccessToken();
-    if (!token) {
-      return [];
-    }
-    return listAdminJobs(token);
-  }, [auth]);
+  const loadJobs = useCallback(async (): Promise<JobSummary[]> => listAdminJobs(), []);
 
   const { data, loading, error, refresh } = usePollingResource<JobSummary[]>({
     enabled: auth.phase === "authenticated" && auth.backendUser?.role === "admin",

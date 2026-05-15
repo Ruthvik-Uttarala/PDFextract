@@ -26,50 +26,47 @@ export class ApiClientError extends Error {
   }
 }
 
-export async function getCurrentUser(token: string): Promise<UserProfile> {
-  return apiFetch<UserProfile>("/api/me", { token });
+export async function getCurrentUser(): Promise<UserProfile> {
+  return apiFetch<UserProfile>("/api/me", {});
 }
 
-export async function uploadPdf(token: string, file: File): Promise<JobSummary> {
+export async function uploadPdf(file: File): Promise<JobSummary> {
   const formData = new FormData();
   formData.append("file", file);
   return apiFetch<JobSummary>("/api/uploads", {
     method: "POST",
-    token,
     body: formData
   });
 }
 
-export async function listJobs(token: string): Promise<JobSummary[]> {
-  const payload = await apiFetch<{ jobs: JobSummary[] }>("/api/jobs", { token });
+export async function listJobs(): Promise<JobSummary[]> {
+  const payload = await apiFetch<{ jobs: JobSummary[] }>("/api/jobs", {});
   return payload.jobs;
 }
 
-export async function getJobDetail(token: string, jobId: string): Promise<JobDetail> {
-  return apiFetch<JobDetail>(`/api/jobs/${jobId}`, { token });
+export async function getJobDetail(jobId: string): Promise<JobDetail> {
+  return apiFetch<JobDetail>(`/api/jobs/${jobId}`, {});
 }
 
-export async function downloadJobOutput(token: string, jobId: string): Promise<Blob> {
-  return apiFetchBlob(`/api/jobs/${jobId}/download`, { token });
+export async function downloadJobOutput(jobId: string): Promise<Blob> {
+  return apiFetchBlob(`/api/jobs/${jobId}/download`);
 }
 
-export async function listAdminJobs(token: string): Promise<JobSummary[]> {
-  const payload = await apiFetch<{ jobs: JobSummary[] }>("/api/admin/jobs", { token });
+export async function listAdminJobs(): Promise<JobSummary[]> {
+  const payload = await apiFetch<{ jobs: JobSummary[] }>("/api/admin/jobs", {});
   return payload.jobs;
 }
 
-export async function getAdminJobDetail(token: string, jobId: string): Promise<AdminJobDetail> {
-  return apiFetch<AdminJobDetail>(`/api/admin/jobs/${jobId}`, { token });
+export async function getAdminJobDetail(jobId: string): Promise<AdminJobDetail> {
+  return apiFetch<AdminJobDetail>(`/api/admin/jobs/${jobId}`, {});
 }
 
 export async function retryAdminJob(
-  token: string,
   jobId: string,
   notes?: string
 ): Promise<{ job_id: string; processing_attempt_id: string; status: string; current_stage: string | null }> {
   return apiFetch(`/api/admin/jobs/${jobId}/retry`, {
     method: "POST",
-    token,
     json: notes ? { notes } : {}
   });
 }
@@ -78,14 +75,13 @@ async function apiFetch<T>(
   path: string,
   options: {
     method?: "GET" | "POST";
-    token: string;
     body?: FormData;
     json?: Record<string, unknown>;
   }
 ): Promise<T> {
   const response = await fetch(`${getApiBaseUrl()}${path}`, {
     method: options.method || "GET",
-    headers: buildHeaders(options.token, options.json ? { "Content-Type": "application/json" } : undefined),
+    headers: buildHeaders(options.json ? { "Content-Type": "application/json" } : undefined),
     body: options.body || (options.json ? JSON.stringify(options.json) : undefined),
     cache: "no-store"
   });
@@ -97,15 +93,10 @@ async function apiFetch<T>(
   return (await response.json()) as T;
 }
 
-async function apiFetchBlob(
-  path: string,
-  options: {
-    token: string;
-  }
-): Promise<Blob> {
+async function apiFetchBlob(path: string): Promise<Blob> {
   const response = await fetch(`${getApiBaseUrl()}${path}`, {
     method: "GET",
-    headers: buildHeaders(options.token),
+    headers: buildHeaders(),
     cache: "no-store"
   });
 
@@ -116,9 +107,8 @@ async function apiFetchBlob(
   return response.blob();
 }
 
-function buildHeaders(token: string, extraHeaders?: HeadersInit): HeadersInit {
+function buildHeaders(extraHeaders?: HeadersInit): HeadersInit {
   return {
-    Authorization: `Bearer ${token}`,
     ...(extraHeaders || {})
   };
 }

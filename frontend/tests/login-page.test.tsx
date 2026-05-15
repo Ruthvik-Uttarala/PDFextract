@@ -5,20 +5,20 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import LoginPage from "@/app/login/page";
 
 const replace = vi.fn();
-const signInWithGoogle = vi.fn(async () => undefined);
+const continueToDemo = vi.fn(async () => undefined);
 
 type AuthState = {
-  phase: "loading" | "unauthenticated" | "authenticated" | "config-missing" | "error";
+  phase: "loading" | "unauthenticated" | "authenticated" | "error";
   missingKeys: string[];
   errorMessage: string | null;
-  signInWithGoogle: () => Promise<void>;
+  continueToDemo: () => Promise<void>;
 };
 
 let authState: AuthState = {
   phase: "unauthenticated",
   missingKeys: [],
   errorMessage: null,
-  signInWithGoogle
+  continueToDemo
 };
 
 vi.mock("next/navigation", () => ({
@@ -34,21 +34,21 @@ vi.mock("@/components/providers/auth-provider", () => ({
 describe("LoginPage", () => {
   beforeEach(() => {
     replace.mockReset();
-    signInWithGoogle.mockClear();
+    continueToDemo.mockClear();
     authState = {
       phase: "unauthenticated",
       missingKeys: [],
       errorMessage: null,
-      signInWithGoogle
+      continueToDemo
     };
   });
 
-  it("starts Firebase Google sign-in from the login screen", async () => {
+  it("starts demo access from the login screen", async () => {
     const user = userEvent.setup();
 
     render(<LoginPage />);
-    await user.click(screen.getByRole("button", { name: "Continue with Google" }));
+    await user.click(screen.getByRole("button", { name: "Continue to PDFextract" }));
 
-    expect(signInWithGoogle).toHaveBeenCalledTimes(1);
+    expect(continueToDemo).toHaveBeenCalledTimes(1);
   });
 });

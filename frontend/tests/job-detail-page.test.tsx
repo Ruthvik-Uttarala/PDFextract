@@ -10,8 +10,7 @@ const triggerBrowserDownload = vi.fn();
 vi.mock("@/components/providers/auth-provider", () => ({
   useAuth: () => ({
     phase: "authenticated",
-    backendUser: { id: "user-1" },
-    getAccessToken: async () => "user-token"
+    backendUser: { id: "user-1" }
   })
 }));
 
@@ -64,7 +63,7 @@ describe("JobDetailPage", () => {
     render(<JobDetailPage params={{ jobId: "job-1" }} />);
     await user.click(screen.getByRole("button", { name: "Download All" }));
 
-    expect(downloadJobOutput).toHaveBeenCalledWith("user-token", "job-1");
+    expect(downloadJobOutput).toHaveBeenCalledWith("job-1");
     expect(triggerBrowserDownload).toHaveBeenCalled();
   });
 });

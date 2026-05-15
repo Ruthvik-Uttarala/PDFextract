@@ -15,13 +15,7 @@ export default function DashboardPage() {
   const auth = useAuth();
   const [downloadError, setDownloadError] = useState<string | null>(null);
 
-  const loadJobs = useCallback(async (): Promise<JobSummary[]> => {
-    const token = await auth.getAccessToken();
-    if (!token) {
-      return [];
-    }
-    return listJobs(token);
-  }, [auth]);
+  const loadJobs = useCallback(async (): Promise<JobSummary[]> => listJobs(), []);
 
   const { data, loading, error } = usePollingResource<JobSummary[]>({
     enabled: auth.phase === "authenticated",
@@ -36,13 +30,8 @@ export default function DashboardPage() {
   const readyJobs = jobs.filter((job) => job.status === "completed" && job.output_ready).slice(0, 3);
 
   async function handleDownload(job: JobSummary): Promise<void> {
-    const token = await auth.getAccessToken();
-    if (!token) {
-      return;
-    }
-
     try {
-      const blob = await downloadJobOutput(token, job.job_id);
+      const blob = await downloadJobOutput(job.job_id);
       triggerBrowserDownload(blob, job.source_filename.replace(/\.pdf$/i, ".xlsx"));
       setDownloadError(null);
     } catch (reason) {

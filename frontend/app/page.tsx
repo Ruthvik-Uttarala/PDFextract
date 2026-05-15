@@ -11,11 +11,11 @@ export default function HomePage() {
 
   useEffect(() => {
     if (auth.phase === "authenticated") {
-      router.replace("/dashboard");
+      router.replace("/upload");
       return;
     }
 
-    if (auth.phase === "unauthenticated" || auth.phase === "config-missing" || auth.phase === "error") {
+    if (auth.phase === "unauthenticated" || auth.phase === "error") {
       router.replace("/login");
     }
   }, [auth.phase, router]);

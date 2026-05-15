@@ -8,8 +8,7 @@ const listJobs = vi.fn();
 vi.mock("@/components/providers/auth-provider", () => ({
   useAuth: () => ({
     phase: "authenticated",
-    backendUser: { id: "user-1" },
-    getAccessToken: async () => "user-token"
+    backendUser: { id: "user-1" }
   })
 }));
 
