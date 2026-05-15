@@ -72,6 +72,7 @@ def authenticate_request(settings: Settings) -> AuthenticatedContext:
         raise RuntimeError("DB session has not been attached to the request context")
 
     bearer_token = get_bearer_token_from_request()
+    claims: dict[str, Any]
     if bearer_token is None:
         claims = _build_demo_claims()
     else:

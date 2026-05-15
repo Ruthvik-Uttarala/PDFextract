@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import Boolean, ForeignKey, String
+from sqlalchemy import JSON, Boolean, ForeignKey, String
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -18,7 +18,16 @@ class ExtractionResult(PrimaryKeyMixin, TimestampMixin, Base):
     )
     document_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
     schema_version: Mapped[str] = mapped_column(String(32), nullable=False)
-    extracted_json: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False)
-    normalized_json: Mapped[dict[str, object] | None] = mapped_column(JSONB, nullable=True)
+    extracted_json: Mapped[dict[str, object]] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"),
+        nullable=False,
+    )
+    normalized_json: Mapped[dict[str, object] | None] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"),
+        nullable=True,
+    )
     validation_passed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    validation_errors: Mapped[list[dict[str, object]] | None] = mapped_column(JSONB, nullable=True)
+    validation_errors: Mapped[list[dict[str, object]] | None] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"),
+        nullable=True,
+    )

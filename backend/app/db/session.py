@@ -8,8 +8,10 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
+import app.db.models  # noqa: F401
 from app.core.config import Settings
 from app.core.errors import ConfigurationError, DependencyError
+from app.db.base import Base
 
 
 def build_engine(settings: Settings) -> Engine:
@@ -24,10 +26,15 @@ def _build_engine_for_database_url(database_url: str) -> Engine:
     if not database_url:
         raise ConfigurationError("DATABASE_URL is required")
 
+    connect_args: dict[str, object] = {}
+    if database_url.startswith("sqlite"):
+        connect_args["check_same_thread"] = False
+
     return create_engine(
         database_url,
         future=True,
         pool_pre_ping=True,
+        connect_args=connect_args,
     )
 
 
@@ -73,3 +80,8 @@ def ping_database(settings: Settings) -> None:
 
 def reset_engine_cache() -> None:
     _build_engine_for_database_url.cache_clear()
+
+
+def ensure_database_schema(settings: Settings) -> None:
+    engine = get_engine(settings)
+    Base.metadata.create_all(bind=engine)

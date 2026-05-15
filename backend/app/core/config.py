@@ -44,6 +44,11 @@ class Settings:
     api_base_url: str = "http://127.0.0.1:8000"
     cors_allowed_origins: str = "http://127.0.0.1:3000,http://localhost:3000"
     upload_max_pdf_bytes: int = 26214400
+    demo_mode: bool = False
+    storage_backend: str = "s3"
+    queue_backend: str = "kafka"
+    local_storage_path: str = "/tmp/pdfextract-storage"
+    auto_init_db: bool = False
 
     @property
     def firebase_emulator_host(self) -> str:
@@ -144,6 +149,19 @@ class Settings:
             upload_max_pdf_bytes=_read_int(
                 os.getenv("UPLOAD_MAX_PDF_BYTES"),
                 default=cls.upload_max_pdf_bytes,
+            ),
+            demo_mode=_read_bool(
+                os.getenv("DEMO_MODE"),
+                default=cls.demo_mode,
+            ),
+            storage_backend=_read_env("STORAGE_BACKEND", cls.storage_backend)
+            or cls.storage_backend,
+            queue_backend=_read_env("QUEUE_BACKEND", cls.queue_backend) or cls.queue_backend,
+            local_storage_path=_read_env("LOCAL_STORAGE_PATH", cls.local_storage_path)
+            or cls.local_storage_path,
+            auto_init_db=_read_bool(
+                os.getenv("AUTO_INIT_DB"),
+                default=cls.auto_init_db,
             ),
         )
 

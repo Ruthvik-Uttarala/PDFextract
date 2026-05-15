@@ -17,11 +17,14 @@ from app.api.routes import (
 from app.core import FailureCode, Settings, configure_logging, get_logger, get_settings
 from app.core.errors import ApiError
 from app.db import create_session
+from app.db.session import ensure_database_schema
 
 
 def create_app(settings: Settings | None = None, testing: bool = False) -> Flask:
     resolved_settings = settings or get_settings()
     configure_logging(resolved_settings.log_level)
+    if resolved_settings.auto_init_db or resolved_settings.demo_mode:
+        ensure_database_schema(resolved_settings)
 
     app = Flask(__name__)
     app.config["TESTING"] = testing
