@@ -18,6 +18,7 @@ export type JobTimelineItem = {
 export type JobSummary = {
   job_id: string;
   source_filename: string;
+  source_file_size_bytes: number | null;
   status: JobStatus;
   document_type: string | null;
   current_stage: string | null;

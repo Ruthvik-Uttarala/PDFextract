@@ -19,6 +19,7 @@ vi.mock("@/hooks/use-polling-resource", () => ({
       {
         job_id: "job-1",
         source_filename: "invoice.pdf",
+        source_file_size_bytes: 2516582,
         status: "completed",
         document_type: "invoice",
         current_stage: "completion_persisted",

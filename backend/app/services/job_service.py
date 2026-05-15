@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from sqlalchemy.orm import Session
 
 from app.core import (
-    TIMELINE_STAGE_LABELS,
     AdminActionType,
     FailureCode,
     FileRole,
@@ -153,9 +152,11 @@ def serialize_job_summary(
     include_owner: bool = False,
 ) -> dict[str, object]:
     artifact = get_job_artifact_info(session, job)
+    source_file = get_file_record(session, job.source_file_id) if job.source_file_id else None
     payload: dict[str, object] = {
         "job_id": job.id,
         "source_filename": job.source_filename,
+        "source_file_size_bytes": source_file.size_bytes if source_file else None,
         "status": job.job_status,
         "document_type": job.document_type,
         "current_stage": job.current_stage,
@@ -404,52 +405,58 @@ def get_job_artifact_info(session: Session, job: Job) -> JobArtifactInfo:
 
 
 def _build_timeline(job: Job) -> list[dict[str, object]]:
-    stage_order = [
-        JobStage.UPLOAD_RECEIVED,
-        JobStage.SOURCE_STORED,
-        JobStage.WORKER_STARTED,
-        JobStage.GEMINI_EXTRACTION,
-        JobStage.EXCEL_GENERATION,
-        JobStage.COMPLETION_PERSISTED,
+    step_order = [
+        ("extract_text", "Extracting text"),
+        ("detect_tables", "Detecting tables"),
+        ("extract_images", "Extracting images"),
+        ("run_ocr", "Running OCR"),
     ]
-    display_stage = _display_stage_for_timeline(job.current_stage)
-    current_index = stage_order.index(display_stage) if display_stage in stage_order else -1
+    current_index = _processing_step_index(job.current_stage)
+    if current_index < 0:
+        current_index = 0
 
     timeline: list[dict[str, object]] = []
-    for index, stage in enumerate(stage_order):
+    for index, (stage, label) in enumerate(step_order):
         state = "pending"
-        if index < current_index:
+        if job.job_status == JobStatus.COMPLETED:
+            state = "completed"
+        elif index < current_index:
             state = "completed"
         elif index == current_index:
-            state = "completed" if job.job_status == JobStatus.COMPLETED else "current"
-
+            state = "current"
         if job.job_status == JobStatus.FAILED and index == current_index:
             state = "failed"
 
         timeline.append(
             {
                 "stage": stage,
-                "label": TIMELINE_STAGE_LABELS[stage],
+                "label": label,
                 "state": state,
             }
         )
     return timeline
 
 
-def _display_stage_for_timeline(stage: str | None) -> str | None:
-    if stage in {JobStage.UPLOAD_RECEIVED}:
-        return JobStage.UPLOAD_RECEIVED
-    if stage in {JobStage.SOURCE_STORED, JobStage.EVENT_PUBLISHED}:
-        return JobStage.SOURCE_STORED
-    if stage in {JobStage.WORKER_STARTED, JobStage.PDF_READING}:
-        return JobStage.WORKER_STARTED
-    if stage in {JobStage.GEMINI_EXTRACTION, JobStage.NORMALIZATION, JobStage.VALIDATION}:
-        return JobStage.GEMINI_EXTRACTION
-    if stage in {JobStage.EXCEL_GENERATION, JobStage.ARTIFACT_STORAGE}:
-        return JobStage.EXCEL_GENERATION
-    if stage == JobStage.COMPLETION_PERSISTED:
-        return JobStage.COMPLETION_PERSISTED
-    return None
+def _processing_step_index(stage: str | None) -> int:
+    if stage in {
+        JobStage.UPLOAD_RECEIVED,
+        JobStage.SOURCE_STORED,
+        JobStage.EVENT_PUBLISHED,
+        JobStage.WORKER_STARTED,
+        JobStage.PDF_READING,
+    }:
+        return 0
+    if stage == JobStage.GEMINI_EXTRACTION:
+        return 1
+    if stage in {JobStage.NORMALIZATION, JobStage.VALIDATION}:
+        return 2
+    if stage in {
+        JobStage.EXCEL_GENERATION,
+        JobStage.ARTIFACT_STORAGE,
+        JobStage.COMPLETION_PERSISTED,
+    }:
+        return 3
+    return -1
 
 
 def _friendly_failure_message(failure_code: str | None, fallback: str | None) -> str | None:
