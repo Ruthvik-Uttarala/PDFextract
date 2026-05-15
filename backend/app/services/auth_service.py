@@ -15,11 +15,14 @@ from app.db.repositories import upsert_user_from_claims
 from app.services.firebase_service import initialize_firebase_app, verify_bearer_token
 
 Handler = TypeVar("Handler", bound=Callable[..., Any])
+DEMO_USER_UID = "demo-mvp-user"
+DEMO_USER_EMAIL = "demo@pdfextract.app"
+DEMO_USER_NAME = "PDFextract Demo User"
 
 
 @dataclass(frozen=True)
 class AuthenticatedContext:
-    bearer_token: str
+    bearer_token: str | None
     claims: dict[str, Any]
     user: User
 
@@ -28,8 +31,11 @@ def initialize_auth(settings: Settings) -> None:
     initialize_firebase_app(settings)
 
 
-def get_bearer_token_from_request() -> str:
+def get_bearer_token_from_request() -> str | None:
     header = request.headers.get("Authorization", "").strip()
+    if not header:
+        return None
+
     if not header.startswith("Bearer "):
         raise ApiError(
             code=FailureCode.AUTH_INVALID,
@@ -47,6 +53,15 @@ def get_bearer_token_from_request() -> str:
     return token
 
 
+def _build_demo_claims() -> dict[str, str]:
+    return {
+        "uid": DEMO_USER_UID,
+        "user_id": DEMO_USER_UID,
+        "email": DEMO_USER_EMAIL,
+        "name": DEMO_USER_NAME,
+    }
+
+
 def authenticate_request(settings: Settings) -> AuthenticatedContext:
     existing = getattr(g, "auth_context", None)
     if isinstance(existing, AuthenticatedContext):
@@ -57,15 +72,18 @@ def authenticate_request(settings: Settings) -> AuthenticatedContext:
         raise RuntimeError("DB session has not been attached to the request context")
 
     bearer_token = get_bearer_token_from_request()
-    try:
-        claims = dict(verify_bearer_token(settings, bearer_token))
-    except Exception as exc:
-        raise ApiError(
-            code=FailureCode.AUTH_INVALID,
-            message="Authentication failed.",
-            status_code=HTTPStatus.UNAUTHORIZED,
-            details={"reason": str(exc)},
-        ) from exc
+    if bearer_token is None:
+        claims = _build_demo_claims()
+    else:
+        try:
+            claims = dict(verify_bearer_token(settings, bearer_token))
+        except Exception as exc:
+            raise ApiError(
+                code=FailureCode.AUTH_INVALID,
+                message="Authentication failed.",
+                status_code=HTTPStatus.UNAUTHORIZED,
+                details={"reason": str(exc)},
+            ) from exc
 
     user = upsert_user_from_claims(
         session,

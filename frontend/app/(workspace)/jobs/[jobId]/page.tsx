@@ -50,13 +50,7 @@ export default function JobDetailPage({ params }: { params: { jobId: string } })
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<ResultTab>("text");
 
-  const loadJob = useCallback(async (): Promise<JobDetail> => {
-    const token = await auth.getAccessToken();
-    if (!token) {
-      throw new Error("Your session expired. Sign in again.");
-    }
-    return getJobDetail(token, params.jobId);
-  }, [auth, params.jobId]);
+  const loadJob = useCallback(async (): Promise<JobDetail> => getJobDetail(params.jobId), [params.jobId]);
 
   const {
     data: job,
@@ -86,14 +80,9 @@ export default function JobDetailPage({ params }: { params: { jobId: string } })
     if (!job) {
       return;
     }
-    const token = await auth.getAccessToken();
-    if (!token) {
-      setDownloadError("Your session expired. Sign in again.");
-      return;
-    }
 
     try {
-      const blob = await downloadJobOutput(token, job.job_id);
+      const blob = await downloadJobOutput(job.job_id);
       triggerBrowserDownload(blob, job.source_filename.replace(/\.pdf$/i, ".xlsx"));
       setDownloadError(null);
     } catch (reason) {

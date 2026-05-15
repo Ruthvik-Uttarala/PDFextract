@@ -55,15 +55,6 @@ export function AppShell({
     return <AuthStateScreen title="Checking session" body="Loading your workspace." />;
   }
 
-  if (auth.phase === "config-missing") {
-    return (
-      <AuthStateScreen
-        title="Configuration missing"
-        body={`Missing public keys: ${auth.missingKeys.join(", ")}`}
-      />
-    );
-  }
-
   if (auth.phase === "error") {
     return (
       <AuthStateScreen

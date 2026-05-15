@@ -8,101 +8,60 @@ import {
   useState,
   type ReactNode
 } from "react";
-import {
-  onAuthStateChanged,
-  signInWithPopup,
-  signOut,
-  type User as FirebaseUser
-} from "firebase/auth";
 
 import { getCurrentUser } from "@/lib/api/client";
-import { getApiBaseUrlStatus, getFirebaseClientConfigStatus } from "@/lib/env";
-import { createGoogleProvider, getFirebaseAuth } from "@/lib/firebase/client";
+import { getApiBaseUrlStatus } from "@/lib/env";
 import type { UserProfile } from "@/lib/types";
 
-type AuthPhase = "loading" | "unauthenticated" | "authenticated" | "config-missing" | "error";
+type AuthPhase = "loading" | "unauthenticated" | "authenticated" | "error";
 
 type AuthContextValue = {
   phase: AuthPhase;
-  firebaseUser: FirebaseUser | null;
   backendUser: UserProfile | null;
   missingKeys: string[];
   errorMessage: string | null;
-  signInWithGoogle: () => Promise<void>;
+  continueToDemo: () => Promise<void>;
   signOutUser: () => Promise<void>;
-  getAccessToken: () => Promise<string | null>;
   refreshSession: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+const DEMO_SESSION_KEY = "pdfextract-demo-session";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [phase, setPhase] = useState<AuthPhase>("loading");
-  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [backendUser, setBackendUser] = useState<UserProfile | null>(null);
   const [missingKeys, setMissingKeys] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    const firebaseStatus = getFirebaseClientConfigStatus();
     const apiStatus = getApiBaseUrlStatus();
-    const missingKeys = [...firebaseStatus.missingKeys, ...apiStatus.missingKeys];
+    const missingKeys = [...apiStatus.missingKeys];
     if (missingKeys.length > 0) {
-      setPhase("config-missing");
+      setPhase("error");
       setMissingKeys(missingKeys);
+      setErrorMessage(`Missing public keys: ${missingKeys.join(", ")}`);
       return () => undefined;
     }
 
-    let isCancelled = false;
-    let unsubscribe: (() => void) | undefined;
+    const hasSession =
+      typeof window !== "undefined" && window.localStorage.getItem(DEMO_SESSION_KEY) === "active";
+    if (!hasSession) {
+      startTransition(() => {
+        setBackendUser(null);
+        setErrorMessage(null);
+        setPhase("unauthenticated");
+      });
+      return () => undefined;
+    }
 
-    void (async () => {
-      try {
-        const auth = await getFirebaseAuth();
-        unsubscribe = onAuthStateChanged(auth, (user) => {
-          if (isCancelled) {
-            return;
-          }
-
-          if (!user) {
-            startTransition(() => {
-              setFirebaseUser(null);
-              setBackendUser(null);
-              setErrorMessage(null);
-              setPhase("unauthenticated");
-            });
-            return;
-          }
-
-          startTransition(() => {
-            setPhase("loading");
-            setFirebaseUser(user);
-          });
-          void syncBackendProfile(user);
-        });
-      } catch (error) {
-        if (isCancelled) {
-          return;
-        }
-        startTransition(() => {
-          setErrorMessage(
-            error instanceof Error ? error.message : "Firebase authentication could not start."
-          );
-          setPhase("error");
-        });
-      }
-    })();
-
-    return () => {
-      isCancelled = true;
-      unsubscribe?.();
-    };
+    void refreshSession();
+    return () => undefined;
   }, []);
 
-  async function syncBackendProfile(user: FirebaseUser): Promise<void> {
+  async function syncBackendProfile(): Promise<void> {
     try {
-      const token = await user.getIdToken();
-      const profile = await getCurrentUser(token);
+      const profile = await getCurrentUser();
       startTransition(() => {
         setBackendUser(profile);
         setErrorMessage(null);
@@ -117,30 +76,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  async function signInWithGoogle(): Promise<void> {
-    const auth = await getFirebaseAuth();
-    await signInWithPopup(auth, createGoogleProvider());
+  async function continueToDemo(): Promise<void> {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(DEMO_SESSION_KEY, "active");
+    }
+    startTransition(() => {
+      setPhase("loading");
+    });
+    await syncBackendProfile();
   }
 
   async function signOutUser(): Promise<void> {
-    const auth = await getFirebaseAuth();
-    await signOut(auth);
-  }
-
-  async function getAccessToken(): Promise<string | null> {
-    const auth = await getFirebaseAuth();
-    const currentUser = auth.currentUser;
-    if (!currentUser) {
-      return null;
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(DEMO_SESSION_KEY);
     }
-    return currentUser.getIdToken();
+    startTransition(() => {
+      setBackendUser(null);
+      setErrorMessage(null);
+      setPhase("unauthenticated");
+    });
   }
 
   async function refreshSession(): Promise<void> {
-    const auth = await getFirebaseAuth();
-    if (!auth.currentUser) {
+    const hasSession =
+      typeof window !== "undefined" && window.localStorage.getItem(DEMO_SESSION_KEY) === "active";
+    if (!hasSession) {
       startTransition(() => {
         setBackendUser(null);
+        setErrorMessage(null);
         setPhase("unauthenticated");
       });
       return;
@@ -148,18 +111,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     startTransition(() => {
       setPhase("loading");
     });
-    await syncBackendProfile(auth.currentUser);
+    await syncBackendProfile();
   }
 
   const value: AuthContextValue = {
     phase,
-    firebaseUser,
     backendUser,
     missingKeys,
     errorMessage,
-    signInWithGoogle,
+    continueToDemo,
     signOutUser,
-    getAccessToken,
     refreshSession
   };
 

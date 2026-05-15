@@ -18,13 +18,10 @@ export default function AdminJobDetailPage({ params }: { params: { jobId: string
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [submittingRetry, setSubmittingRetry] = useState(false);
 
-  const loadJob = useCallback(async (): Promise<AdminJobDetail> => {
-    const token = await auth.getAccessToken();
-    if (!token) {
-      throw new Error("Your session expired. Sign in again.");
-    }
-    return getAdminJobDetail(token, params.jobId);
-  }, [auth, params.jobId]);
+  const loadJob = useCallback(
+    async (): Promise<AdminJobDetail> => getAdminJobDetail(params.jobId),
+    [params.jobId],
+  );
 
   const { data: job, loading, error, refresh } = usePollingResource<AdminJobDetail>({
     enabled: auth.phase === "authenticated" && auth.backendUser?.role === "admin",
@@ -41,14 +38,13 @@ export default function AdminJobDetailPage({ params }: { params: { jobId: string
   }, [job]);
 
   async function handleRetry(): Promise<void> {
-    const token = await auth.getAccessToken();
-    if (!token || !job) {
+    if (!job) {
       return;
     }
 
     try {
       setSubmittingRetry(true);
-      const response = await retryAdminJob(token, job.job_id, notes.trim() || undefined);
+      const response = await retryAdminJob(job.job_id, notes.trim() || undefined);
       setActionError(null);
       setActionMessage(`Retry queued as attempt ${job.retry.attempt_count + 1}. Current status: ${response.status}.`);
       setNotes("");
@@ -62,13 +58,12 @@ export default function AdminJobDetailPage({ params }: { params: { jobId: string
   }
 
   async function handleDownload(): Promise<void> {
-    const token = await auth.getAccessToken();
-    if (!token || !job) {
+    if (!job) {
       return;
     }
 
     try {
-      const blob = await downloadJobOutput(token, job.job_id);
+      const blob = await downloadJobOutput(job.job_id);
       triggerBrowserDownload(blob, job.source_filename.replace(/\.pdf$/i, ".xlsx"));
       setActionError(null);
     } catch (reason) {

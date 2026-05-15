@@ -1,14 +1,8 @@
 import type { Metadata } from "next";
-import { Manrope } from "next/font/google";
 
 import { AuthProvider } from "@/components/providers/auth-provider";
 
 import "./globals.css";
-
-const manrope = Manrope({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"]
-});
 
 export const metadata: Metadata = {
   title: "PDFextract",
@@ -22,7 +16,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={manrope.className}>
+      <body style={{ fontFamily: "'Segoe UI', 'Helvetica Neue', Arial, sans-serif" }}>
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>

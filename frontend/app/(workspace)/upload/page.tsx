@@ -3,7 +3,6 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
 
-import { useAuth } from "@/components/providers/auth-provider";
 import { uploadPdf } from "@/lib/api/client";
 
 type ExtractionOption = "text" | "tables" | "ocr";
@@ -12,7 +11,6 @@ const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 const ALLOWED_MIME_TYPES = new Set(["application/pdf", "application/x-pdf"]);
 
 export default function UploadPage() {
-  const auth = useAuth();
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -72,15 +70,9 @@ export default function UploadPage() {
       return;
     }
 
-    const token = await auth.getAccessToken();
-    if (!token) {
-      setMessage("Your session expired. Sign in again.");
-      return;
-    }
-
     try {
       setSubmitting(true);
-      const job = await uploadPdf(token, selectedFile);
+      const job = await uploadPdf(selectedFile);
       router.push(`/jobs/${job.job_id}`);
     } catch (reason) {
       setMessage(reason instanceof Error ? reason.message : "Upload failed. Please try again.");

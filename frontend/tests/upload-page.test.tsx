@@ -7,22 +7,10 @@ import UploadPage from "@/app/(workspace)/upload/page";
 const push = vi.fn();
 const uploadPdf = vi.fn();
 
-type AuthState = {
-  getAccessToken: () => Promise<string | null>;
-};
-
-const authState: AuthState = {
-  getAccessToken: async () => "user-token"
-};
-
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
     push
   })
-}));
-
-vi.mock("@/components/providers/auth-provider", () => ({
-  useAuth: () => authState
 }));
 
 vi.mock("@/lib/api/client", () => ({
@@ -45,7 +33,7 @@ describe("UploadPage", () => {
     await user.upload(screen.getByLabelText(/drag & drop your pdf here/i), file);
     await user.click(screen.getByRole("button", { name: /Extract Now/i }));
 
-    expect(uploadPdf).toHaveBeenCalledWith("user-token", file);
+    expect(uploadPdf).toHaveBeenCalledWith(file);
     expect(push).toHaveBeenCalledWith("/jobs/job-123");
   });
 });
