@@ -22,22 +22,8 @@ def validate_normalized_output(normalized_json: dict[str, Any]) -> ValidationRes
 
 def _validate_invoice(normalized_json: dict[str, Any]) -> ValidationResult:
     errors: list[dict[str, object]] = []
-    required_fields = {
-        "vendor.name": (
-            normalized_json.get("vendor", {}).get("name")
-            if isinstance(normalized_json.get("vendor"), dict)
-            else None
-        ),
-        "invoice_number": normalized_json.get("invoice_number"),
-        "invoice_date": normalized_json.get("invoice_date"),
-        "total_amount": normalized_json.get("total_amount"),
-    }
-    for field, value in required_fields.items():
-        if value in (None, "", []):
-            errors.append({"field": field, "message": "This field is required."})
-
     total_amount = normalized_json.get("total_amount")
-    if total_amount is not None and not _is_decimal(total_amount):
+    if total_amount not in (None, "") and not _is_decimal(total_amount):
         errors.append({"field": "total_amount", "message": "Total amount must be numeric."})
 
     line_items = normalized_json.get("line_items")
@@ -59,13 +45,36 @@ def _validate_invoice(normalized_json: dict[str, Any]) -> ValidationResult:
                 )
             for numeric_field in ("quantity", "unit_price", "line_total"):
                 value = item.get(numeric_field)
-                if value is not None and not _is_decimal(value):
+                if value not in (None, "") and not _is_decimal(value):
                     errors.append(
                         {
                             "field": f"line_items[{index}].{numeric_field}",
                             "message": "Value must be numeric.",
                         }
                     )
+
+    has_invoice_number = bool(_text(normalized_json.get("invoice_number")))
+    has_invoice_date = bool(_text(normalized_json.get("invoice_date")))
+    if not has_invoice_number and not has_invoice_date:
+        errors.append(
+            {
+                "field": "invoice_number|invoice_date",
+                "message": "Either invoice number or invoice date is required.",
+            }
+        )
+
+    has_total_amount = total_amount not in (None, "")
+    has_line_totals = any(
+        isinstance(item, dict) and item.get("line_total") not in (None, "")
+        for item in (line_items if isinstance(line_items, list) else [])
+    )
+    if not has_total_amount and not has_line_totals:
+        errors.append(
+            {
+                "field": "total_amount|line_items.line_total",
+                "message": "A total amount or at least one line total is required.",
+            }
+        )
 
     return ValidationResult(valid=not errors, errors=errors)
 
@@ -99,3 +108,7 @@ def _is_decimal(value: object) -> bool:
     except (InvalidOperation, ValueError):
         return False
     return True
+
+
+def _text(value: object) -> str:
+    return str(value).strip() if value is not None else ""

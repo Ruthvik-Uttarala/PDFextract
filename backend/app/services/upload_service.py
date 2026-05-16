@@ -13,6 +13,7 @@ from app.db.repositories import create_file_record, create_job, mark_job_failed
 from app.services.job_service import serialize_job_summary
 from app.services.kafka_service import build_job_event, publish_submit_event
 from app.services.storage_service import build_source_key, put_object_bytes
+from app.services.worker_service import process_worker_event
 
 ALLOWED_PDF_CONTENT_TYPES = {"application/pdf", "application/x-pdf", "application/octet-stream"}
 
@@ -100,6 +101,11 @@ def submit_upload(
 
     job.current_stage = JobStage.EVENT_PUBLISHED
     session.commit()
+
+    if _inline_queue_enabled(settings):
+        process_worker_event(session, settings=settings, event_payload=event.to_dict())
+        session.commit()
+
     return serialize_job_summary(session, job)
 
 
@@ -173,3 +179,12 @@ def _coerce_size_bytes(storage_metadata: dict[str, object]) -> int:
     if value is None:
         return 0
     return int(str(value))
+
+
+def _inline_queue_enabled(settings: Settings) -> bool:
+    if settings.demo_mode:
+        return True
+    return (
+        settings.queue_backend.strip().lower() == "inline"
+        or settings.kafka_bootstrap_servers.strip().lower() == "inline"
+    )

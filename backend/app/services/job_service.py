@@ -31,6 +31,7 @@ from app.db.repositories import (
     update_job_queue_state,
 )
 from app.services.kafka_service import build_job_event, publish_retry_event
+from app.services.worker_service import process_worker_event
 
 
 @dataclass(frozen=True)
@@ -137,6 +138,10 @@ def retry_job(
         raise
 
     job.current_stage = JobStage.EVENT_PUBLISHED
+    session.commit()
+    if _inline_queue_enabled(settings):
+        process_worker_event(session, settings=settings, event_payload=event.to_dict())
+        session.commit()
     return {
         "job_id": job.id,
         "processing_attempt_id": attempt.id,
@@ -481,3 +486,12 @@ def _iso(value: object) -> str | None:
     if value is None:
         return None
     return str(value.isoformat()) if hasattr(value, "isoformat") else str(value)
+
+
+def _inline_queue_enabled(settings: Settings) -> bool:
+    if settings.demo_mode:
+        return True
+    return (
+        settings.queue_backend.strip().lower() == "inline"
+        or settings.kafka_bootstrap_servers.strip().lower() == "inline"
+    )

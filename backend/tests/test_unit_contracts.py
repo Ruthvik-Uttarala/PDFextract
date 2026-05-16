@@ -17,7 +17,9 @@ from app.db.repositories import (
     upsert_user_from_claims,
 )
 from app.services.excel_service import generate_excel_workbook
+from app.services.extraction_service import _mock_extract_invoice
 from app.services.firebase_service import verify_token
+from app.services.pdf_reader_service import PreparedPdf
 from app.services.storage_service import build_processed_key, build_source_key
 from app.services.validation_service import validate_normalized_output
 
@@ -62,8 +64,80 @@ def test_validation_rejects_invalid_invoice_output() -> None:
     )
 
     assert result.valid is False
-    assert any(error["field"] == "vendor.name" for error in result.errors)
+    assert any(error["field"] == "invoice_number|invoice_date" for error in result.errors)
     assert any(error["field"] == "total_amount" for error in result.errors)
+
+
+def test_validation_accepts_invoice_with_optional_header_gaps() -> None:
+    result = validate_normalized_output(
+        {
+            "document_type": "invoice",
+            "vendor": {"name": None},
+            "invoice_number": None,
+            "invoice_date": "05/10/2026",
+            "total_amount": None,
+            "line_items": [
+                {
+                    "description": "Consulting",
+                    "quantity": "1",
+                    "unit_price": "1200.00",
+                    "line_total": "1200.00",
+                }
+            ],
+        }
+    )
+
+    assert result.valid is True
+
+
+def test_mock_invoice_extraction_handles_split_labels_and_two_column_table() -> None:
+    prepared_pdf = PreparedPdf(
+        page_count=1,
+        pages=[],
+        full_text=(
+            "INVOICE\n"
+            "DATE:\n"
+            "July 8, 2011\n"
+            "INVOICE #\n"
+            "4\n"
+            "Vendor Name\n"
+            "TOTAL\n"
+            "567.50\n"
+            "DESCRIPTION\n"
+            "Laundry service (Linens) from April, 2011 (42 x $11)\n"
+            "Laundry service (towels) from April 2011 (71 pieces x $.50)\n"
+            "Laundry service (Aprons) from April 2011 (10 pieces x $7)\n"
+        ),
+        tables=[
+            [
+                ["DESCRIPTION", "AMOUNT"],
+                [
+                    "Laundry service (Linens) from April, 2011 (42 x $11)",
+                    "$ 4 62.00\n3 5.50\n7 0.00",
+                ],
+                ["Laundry service (towels) from April 2011 (71 pieces x $.50)", None],
+                ["Laundry service (Aprons) from April 2011 (10 pieces x $7)", None],
+            ]
+        ],
+        document_type="invoice",
+    )
+
+    extracted = _mock_extract_invoice(prepared_pdf)
+    normalized = {
+        "document_type": "invoice",
+        "vendor": {"name": extracted.get("vendor_name")},
+        "invoice_number": extracted.get("invoice_number"),
+        "invoice_date": extracted.get("invoice_date"),
+        "total_amount": extracted.get("total_amount"),
+        "line_items": extracted.get("line_items"),
+    }
+    validation = validate_normalized_output(normalized)
+
+    assert extracted["invoice_number"] == "4"
+    assert extracted["invoice_date"] == "July 8, 2011"
+    assert extracted["total_amount"] == "567.50"
+    assert len(extracted["line_items"]) >= 3
+    assert validation.valid is True
 
 
 def test_excel_generation_creates_expected_invoice_workbook() -> None:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from pathlib import Path
 from typing import Any
 
 import boto3
@@ -30,6 +31,20 @@ def build_processed_key(settings: Settings, user_id: str, job_id: str) -> str:
 
 
 def ensure_bucket_and_prefixes(settings: Settings) -> dict[str, str | list[str]]:
+    if _use_local_storage(settings):
+        base = _local_storage_root(settings)
+        receiving_prefix, processed_prefix = canonical_storage_prefixes(settings)
+        local_prefix_markers: list[str] = []
+        for prefix in (receiving_prefix, processed_prefix):
+            marker_path = base / prefix / ".keep"
+            marker_path.parent.mkdir(parents=True, exist_ok=True)
+            marker_path.write_bytes(b"")
+            local_prefix_markers.append(f"{prefix}/.keep")
+        return {
+            "bucket": settings.s3_bucket_name,
+            "prefix_markers": local_prefix_markers,
+        }
+
     client = _create_s3_client(settings)
 
     try:
@@ -54,6 +69,11 @@ def ensure_bucket_and_prefixes(settings: Settings) -> dict[str, str | list[str]]
 
 
 def check_storage_connection(settings: Settings) -> dict[str, str]:
+    if _use_local_storage(settings):
+        base = _local_storage_root(settings)
+        base.mkdir(parents=True, exist_ok=True)
+        return {"endpoint": f"file://{base}", "bucket": settings.s3_bucket_name}
+
     client = _create_s3_client(settings)
     client.list_buckets()
     return {"endpoint": settings.s3_endpoint_url, "bucket": settings.s3_bucket_name}
@@ -70,6 +90,18 @@ def put_object_bytes(
     body: bytes,
     content_type: str,
 ) -> dict[str, object]:
+    if _use_local_storage(settings):
+        target_path = _local_path_for_key(settings, key)
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        target_path.write_bytes(body)
+        return {
+            "bucket": settings.s3_bucket_name,
+            "key": key,
+            "etag": "",
+            "size_bytes": len(body),
+            "content_type": content_type,
+        }
+
     client = _create_s3_client(settings)
     try:
         response = client.put_object(
@@ -91,6 +123,12 @@ def put_object_bytes(
 
 
 def get_object_bytes(settings: Settings, *, key: str) -> bytes:
+    if _use_local_storage(settings):
+        target_path = _local_path_for_key(settings, key)
+        if not target_path.exists():
+            raise FileNotFoundError(key)
+        return target_path.read_bytes()
+
     client = _create_s3_client(settings)
     try:
         response = client.get_object(Bucket=settings.s3_bucket_name, Key=key)
@@ -104,6 +142,13 @@ def get_object_bytes(settings: Settings, *, key: str) -> bytes:
 def stream_object(
     settings: Settings, *, key: str, chunk_size: int | None = None
 ) -> Iterator[bytes]:
+    if _use_local_storage(settings):
+        payload = get_object_bytes(settings, key=key)
+        read_size = chunk_size or settings.download_chunk_size
+        for index in range(0, len(payload), read_size):
+            yield payload[index : index + read_size]
+        return
+
     client = _create_s3_client(settings)
     try:
         response = client.get_object(Bucket=settings.s3_bucket_name, Key=key)
@@ -122,6 +167,9 @@ def stream_object(
 
 
 def object_exists(settings: Settings, *, key: str) -> bool:
+    if _use_local_storage(settings):
+        return _local_path_for_key(settings, key).exists()
+
     client = _create_s3_client(settings)
     try:
         client.head_object(Bucket=settings.s3_bucket_name, Key=key)
@@ -133,8 +181,29 @@ def object_exists(settings: Settings, *, key: str) -> bool:
 
 
 def delete_object(settings: Settings, *, key: str) -> None:
+    if _use_local_storage(settings):
+        target_path = _local_path_for_key(settings, key)
+        if target_path.exists():
+            target_path.unlink()
+        return
+
     client = _create_s3_client(settings)
     client.delete_object(Bucket=settings.s3_bucket_name, Key=key)
+
+
+def _use_local_storage(settings: Settings) -> bool:
+    return settings.demo_mode or settings.storage_backend.strip().lower() == "local"
+
+
+def _local_storage_root(settings: Settings) -> Path:
+    return Path(settings.local_storage_path).resolve()
+
+
+def _local_path_for_key(settings: Settings, key: str) -> Path:
+    normalized_key = key.strip().lstrip("/")
+    if not normalized_key:
+        raise ValueError("Storage key cannot be empty")
+    return _local_storage_root(settings) / normalized_key
 
 
 def _create_s3_client(settings: Settings) -> Any:

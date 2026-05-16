@@ -56,6 +56,9 @@ def build_job_event(
 
 
 def check_kafka_connection(settings: Settings) -> dict[str, str | int]:
+    if _use_inline_queue(settings):
+        return {"brokers": 0, "bootstrap_servers": "inline"}
+
     metadata = _create_admin_client(settings).list_topics(timeout=10)
     return {
         "brokers": len(metadata.brokers),
@@ -68,6 +71,9 @@ def ping_kafka(settings: Settings) -> dict[str, str | int]:
 
 
 def ensure_topics(settings: Settings) -> dict[str, list[str]]:
+    if _use_inline_queue(settings):
+        return {"topics": list(REQUIRED_TOPICS)}
+
     admin_client = _create_admin_client(settings)
     metadata = admin_client.list_topics(timeout=10)
     existing_topics = set(metadata.topics.keys())
@@ -95,6 +101,9 @@ def publish_retry_event(settings: Settings, event: KafkaJobEvent) -> dict[str, s
 
 
 def publish_job_event(settings: Settings, *, topic: str, event: KafkaJobEvent) -> dict[str, str]:
+    if _use_inline_queue(settings):
+        return {"topic": "inline", "job_id": event.job_id}
+
     producer = _create_producer(settings)
     payload = json.dumps(event.to_dict()).encode("utf-8")
 
@@ -144,3 +153,11 @@ def _create_admin_client(settings: Settings) -> AdminClient:
 
 def _create_producer(settings: Settings) -> Producer:
     return Producer({"bootstrap.servers": settings.kafka_bootstrap_servers})
+
+
+def _use_inline_queue(settings: Settings) -> bool:
+    if settings.demo_mode:
+        return True
+    queue_backend = settings.queue_backend.strip().lower()
+    bootstrap = settings.kafka_bootstrap_servers.strip().lower()
+    return queue_backend == "inline" or bootstrap == "inline"
