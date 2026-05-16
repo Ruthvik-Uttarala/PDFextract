@@ -3,6 +3,7 @@
 import {
   createContext,
   startTransition,
+  useCallback,
   useContext,
   useEffect,
   useState,
@@ -34,6 +35,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [missingKeys, setMissingKeys] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const syncBackendProfile = useCallback(async (): Promise<void> => {
+    try {
+      const profile = await getCurrentUser();
+      startTransition(() => {
+        setBackendUser(profile);
+        setErrorMessage(null);
+        setPhase("authenticated");
+      });
+    } catch (error) {
+      startTransition(() => {
+        setBackendUser(null);
+        setErrorMessage(error instanceof Error ? error.message : "Backend session sync failed.");
+        setPhase("error");
+      });
+    }
+  }, []);
+
+  const refreshSession = useCallback(async (): Promise<void> => {
+    const hasSession =
+      typeof window !== "undefined" && window.localStorage.getItem(DEMO_SESSION_KEY) === "active";
+    if (!hasSession) {
+      startTransition(() => {
+        setBackendUser(null);
+        setErrorMessage(null);
+        setPhase("unauthenticated");
+      });
+      return;
+    }
+    startTransition(() => {
+      setPhase("loading");
+    });
+    await syncBackendProfile();
+  }, [syncBackendProfile]);
+
   useEffect(() => {
     const apiStatus = getApiBaseUrlStatus();
     const missingKeys = [...apiStatus.missingKeys];
@@ -57,24 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     void refreshSession();
     return () => undefined;
-  }, []);
-
-  async function syncBackendProfile(): Promise<void> {
-    try {
-      const profile = await getCurrentUser();
-      startTransition(() => {
-        setBackendUser(profile);
-        setErrorMessage(null);
-        setPhase("authenticated");
-      });
-    } catch (error) {
-      startTransition(() => {
-        setBackendUser(null);
-        setErrorMessage(error instanceof Error ? error.message : "Backend session sync failed.");
-        setPhase("error");
-      });
-    }
-  }
+  }, [refreshSession]);
 
   async function continueToDemo(): Promise<void> {
     if (typeof window !== "undefined") {
@@ -95,23 +113,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setErrorMessage(null);
       setPhase("unauthenticated");
     });
-  }
-
-  async function refreshSession(): Promise<void> {
-    const hasSession =
-      typeof window !== "undefined" && window.localStorage.getItem(DEMO_SESSION_KEY) === "active";
-    if (!hasSession) {
-      startTransition(() => {
-        setBackendUser(null);
-        setErrorMessage(null);
-        setPhase("unauthenticated");
-      });
-      return;
-    }
-    startTransition(() => {
-      setPhase("loading");
-    });
-    await syncBackendProfile();
   }
 
   const value: AuthContextValue = {

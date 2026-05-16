@@ -126,9 +126,17 @@ def process_worker_event(
         session.commit()
 
         if not validation_result.valid:
+            formatted_errors = "; ".join(
+                f"{error.get('field')}: {error.get('message')}"
+                for error in validation_result.errors[:3]
+                if isinstance(error, dict)
+            )
+            message = "The extracted output did not pass validation."
+            if formatted_errors:
+                message = f"{message} {formatted_errors}"
             raise ApiError(
                 code=FailureCode.VALIDATION_FAILED,
-                message="The extracted output did not pass validation.",
+                message=message,
                 details={"validation_errors": validation_result.errors},
             )
 

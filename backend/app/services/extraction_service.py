@@ -103,12 +103,51 @@ def normalize_extraction_output(
 
 def _mock_extract(prepared_pdf: PreparedPdf) -> dict[str, Any]:
     if prepared_pdf.document_type == DocumentType.INVOICE:
-        return _mock_extract_invoice(prepared_pdf.full_text)
+        return _mock_extract_invoice(prepared_pdf)
     return _mock_extract_report(prepared_pdf)
 
 
-def _mock_extract_invoice(full_text: str) -> dict[str, Any]:
+def _mock_extract_invoice(prepared_pdf: PreparedPdf) -> dict[str, Any]:
+    full_text = prepared_pdf.full_text
     lines = [line.strip() for line in full_text.splitlines() if line.strip()]
+    line_items: list[dict[str, str]] = []
+    line_items.extend(_extract_line_items_from_pipe_lines(lines))
+    line_items.extend(_extract_line_items_from_pdf_tables(prepared_pdf.tables))
+    line_items.extend(_extract_line_items_from_text_rows(lines))
+    line_items = _dedupe_line_items(line_items)
+
+    invoice_number = _search_line_value(lines, ("Invoice Number", "Invoice #", "Invoice No"))
+    if not invoice_number:
+        invoice_number = _extract_invoice_number(full_text)
+
+    invoice_date = _search_line_value(lines, ("Invoice Date", "Date"))
+    if not invoice_date:
+        invoice_date = _extract_labeled_date(full_text, ("invoice date", "date"))
+
+    due_date = _search_line_value(lines, ("Due Date",))
+    if not due_date:
+        due_date = _extract_labeled_date(full_text, ("due date", "payment due"))
+
+    total_amount = _search_line_value(lines, ("Total", "Amount Due", "Balance Due"))
+    if not total_amount:
+        total_amount = _extract_total_amount(full_text)
+
+    vendor_name = _search_line_value(lines, ("Vendor", "From", "Supplier", "Seller"))
+    if not vendor_name:
+        vendor_name = _extract_vendor_name(lines)
+
+    return {
+        "vendor_name": vendor_name,
+        "invoice_number": invoice_number,
+        "invoice_date": invoice_date,
+        "due_date": due_date,
+        "currency": _extract_currency(lines, full_text) or "USD",
+        "total_amount": total_amount,
+        "line_items": line_items,
+    }
+
+
+def _extract_line_items_from_pipe_lines(lines: list[str]) -> list[dict[str, str]]:
     line_items: list[dict[str, str]] = []
     for line in lines:
         if "|" not in line:
@@ -125,16 +164,188 @@ def _mock_extract_invoice(full_text: str) -> dict[str, Any]:
                 "line_total": line_total,
             }
         )
+    return line_items
 
-    return {
-        "vendor_name": _search_line_value(lines, ("Vendor", "From", "Supplier")),
-        "invoice_number": _search_line_value(lines, ("Invoice Number", "Invoice #")),
-        "invoice_date": _search_line_value(lines, ("Invoice Date", "Date")),
-        "due_date": _search_line_value(lines, ("Due Date",)),
-        "currency": _search_line_value(lines, ("Currency",)) or "USD",
-        "total_amount": _search_line_value(lines, ("Total", "Amount Due")),
-        "line_items": line_items,
-    }
+
+def _extract_line_items_from_pdf_tables(
+    tables: list[list[list[str | None]]],
+) -> list[dict[str, str]]:
+    line_items: list[dict[str, str]] = []
+    for table in tables:
+        if not table:
+            continue
+        header_row = [str(cell or "").strip().lower() for cell in table[0]]
+        description_index = _find_header_index(header_row, ("description", "item", "service"))
+        quantity_index = _find_header_index(header_row, ("qty", "quantity"))
+        unit_price_index = _find_header_index(header_row, ("unit price", "rate", "price"))
+        total_index = _find_header_index(header_row, ("amount", "line total", "total"))
+        row_start = 1 if description_index is not None else 0
+
+        for row in table[row_start:]:
+            normalized_row = [str(cell or "").strip() for cell in row]
+            if not any(normalized_row):
+                continue
+
+            description = _cell_at(normalized_row, description_index) or _cell_at(normalized_row, 0)
+            quantity = _cell_at(normalized_row, quantity_index)
+            unit_price = _cell_at(normalized_row, unit_price_index)
+            line_total = _cell_at(normalized_row, total_index) or _cell_at(normalized_row, -1)
+
+            if not description:
+                continue
+            has_numeric_cell = (
+                _looks_numeric(quantity)
+                or _looks_numeric(unit_price)
+                or _looks_numeric(line_total)
+            )
+            if not has_numeric_cell:
+                continue
+
+            line_items.append(
+                {
+                    "description": description,
+                    "quantity": quantity or "",
+                    "unit_price": unit_price or "",
+                    "line_total": line_total or "",
+                }
+            )
+    return line_items
+
+
+def _extract_line_items_from_text_rows(lines: list[str]) -> list[dict[str, str]]:
+    line_items: list[dict[str, str]] = []
+    for line in lines:
+        if "|" in line:
+            continue
+        if _looks_like_summary_line(line):
+            continue
+        match = re.search(
+            r"^(?P<description>.+?)\s+(?P<quantity>\d+(?:\.\d+)?)\s+"
+            r"(?P<unit_price>\$?\d[\d,]*(?:\.\d{1,2})?)\s+"
+            r"(?P<line_total>\$?\d[\d,]*(?:\.\d{1,2})?)$",
+            line,
+        )
+        if not match:
+            continue
+        groups = match.groupdict()
+        line_items.append(
+            {
+                "description": groups["description"].strip(),
+                "quantity": groups["quantity"].strip(),
+                "unit_price": groups["unit_price"].strip(),
+                "line_total": groups["line_total"].strip(),
+            }
+        )
+    return line_items
+
+
+def _dedupe_line_items(items: list[dict[str, str]]) -> list[dict[str, str]]:
+    seen: set[tuple[str, str, str, str]] = set()
+    deduped: list[dict[str, str]] = []
+    for item in items:
+        key = (
+            str(item.get("description") or "").strip().lower(),
+            str(item.get("quantity") or "").strip(),
+            str(item.get("unit_price") or "").strip(),
+            str(item.get("line_total") or "").strip(),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(item)
+    return deduped
+
+
+def _find_header_index(header_row: list[str], options: tuple[str, ...]) -> int | None:
+    for index, value in enumerate(header_row):
+        for option in options:
+            if option in value:
+                return index
+    return None
+
+
+def _cell_at(values: list[str], index: int | None) -> str | None:
+    if index is None:
+        return None
+    if index < 0:
+        index = len(values) + index
+    if index < 0 or index >= len(values):
+        return None
+    value = values[index].strip()
+    return value or None
+
+
+def _extract_invoice_number(full_text: str) -> str | None:
+    labeled_match = re.search(
+        r"\binvoice\s*(?:number|no\.?|#|id)\s*[:#-]?\s*([A-Z0-9][A-Z0-9\-\/]{2,})",
+        full_text,
+        flags=re.IGNORECASE,
+    )
+    if labeled_match:
+        return labeled_match.group(1).strip()
+
+    token_match = re.search(r"\bINV[-/ ]?\d[\w/-]*\b", full_text, flags=re.IGNORECASE)
+    return token_match.group(0).strip() if token_match else None
+
+
+def _extract_labeled_date(full_text: str, labels: tuple[str, ...]) -> str | None:
+    date_pattern = r"(\d{4}-\d{1,2}-\d{1,2}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4})"
+    for label in labels:
+        match = re.search(
+            rf"{re.escape(label)}\s*[:#-]?\s*{date_pattern}",
+            full_text,
+            flags=re.IGNORECASE,
+        )
+        if match:
+            return match.group(1).strip()
+    return None
+
+
+def _extract_total_amount(full_text: str) -> str | None:
+    match = re.search(
+        r"(?:total|amount due|balance due)\s*[:#-]?\s*([$]?\d[\d,]*(?:\.\d{1,2})?)",
+        full_text,
+        flags=re.IGNORECASE,
+    )
+    return match.group(1).strip() if match else None
+
+
+def _extract_currency(lines: list[str], full_text: str) -> str | None:
+    declared = _search_line_value(lines, ("Currency", "Curr"))
+    if declared:
+        return declared.strip().upper()
+
+    currency_match = re.search(
+        r"\b(USD|EUR|GBP|INR|CAD|AUD|JPY)\b",
+        full_text,
+        flags=re.IGNORECASE,
+    )
+    return currency_match.group(1).upper() if currency_match else None
+
+
+def _extract_vendor_name(lines: list[str]) -> str | None:
+    for line in lines[:6]:
+        lowered = line.lower()
+        if any(
+            token in lowered
+            for token in ("invoice", "bill to", "invoice no", "invoice number", "date", "due")
+        ):
+            continue
+        if len(line.split()) >= 2:
+            return line.strip()
+    return None
+
+
+def _looks_numeric(value: str | None) -> bool:
+    if value is None:
+        return False
+    return _to_decimal_or_none(value) is not None
+
+
+def _looks_like_summary_line(line: str) -> bool:
+    lowered = line.lower()
+    summary_tokens = ("total", "subtotal", "tax", "amount due", "balance due")
+    return any(token in lowered for token in summary_tokens)
 
 
 def _mock_extract_report(prepared_pdf: PreparedPdf) -> dict[str, Any]:

@@ -62,8 +62,30 @@ def test_validation_rejects_invalid_invoice_output() -> None:
     )
 
     assert result.valid is False
-    assert any(error["field"] == "vendor.name" for error in result.errors)
+    assert any(error["field"] == "invoice_number|invoice_date" for error in result.errors)
     assert any(error["field"] == "total_amount" for error in result.errors)
+
+
+def test_validation_accepts_invoice_with_optional_header_gaps() -> None:
+    result = validate_normalized_output(
+        {
+            "document_type": "invoice",
+            "vendor": {"name": None},
+            "invoice_number": None,
+            "invoice_date": "05/10/2026",
+            "total_amount": None,
+            "line_items": [
+                {
+                    "description": "Consulting",
+                    "quantity": "1",
+                    "unit_price": "1200.00",
+                    "line_total": "1200.00",
+                }
+            ],
+        }
+    )
+
+    assert result.valid is True
 
 
 def test_excel_generation_creates_expected_invoice_workbook() -> None:
