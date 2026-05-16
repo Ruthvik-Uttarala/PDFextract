@@ -45,7 +45,7 @@ def _validate_invoice(normalized_json: dict[str, Any]) -> ValidationResult:
                 )
             for numeric_field in ("quantity", "unit_price", "line_total"):
                 value = item.get(numeric_field)
-                if value is not None and not _is_decimal(value):
+                if value not in (None, "") and not _is_decimal(value):
                     errors.append(
                         {
                             "field": f"line_items[{index}].{numeric_field}",

@@ -209,7 +209,74 @@ def _extract_line_items_from_pdf_tables(
                     "line_total": line_total or "",
                 }
             )
+        line_items.extend(
+            _extract_line_items_from_two_column_amount_table(
+                table,
+                description_index=description_index,
+                total_index=total_index,
+                row_start=row_start,
+            )
+        )
     return line_items
+
+
+def _extract_line_items_from_two_column_amount_table(
+    table: list[list[str | None]],
+    *,
+    description_index: int | None,
+    total_index: int | None,
+    row_start: int,
+) -> list[dict[str, str]]:
+    if not table:
+        return []
+
+    description_idx = description_index if description_index is not None else 0
+    amount_idx = total_index
+    if amount_idx is None:
+        amount_idx = 1 if len(table[0]) > 1 else None
+    if amount_idx is None:
+        return []
+
+    descriptions: list[str] = []
+    amount_tokens: list[str] = []
+
+    for row in table[row_start:]:
+        normalized_row = [str(cell or "").strip() for cell in row]
+        if not any(normalized_row):
+            continue
+
+        description = _cell_at(normalized_row, description_idx)
+        if description and not _looks_like_summary_line(description):
+            descriptions.append(description)
+
+        amount_cell = _cell_at(normalized_row, amount_idx)
+        if amount_cell:
+            amount_tokens.extend(_extract_amount_tokens(amount_cell))
+
+    if not descriptions or not amount_tokens:
+        return []
+
+    mapped_count = min(len(descriptions), len(amount_tokens))
+    return [
+        {
+            "description": descriptions[index],
+            "quantity": "",
+            "unit_price": "",
+            "line_total": amount_tokens[index],
+        }
+        for index in range(mapped_count)
+    ]
+
+
+def _extract_amount_tokens(value: str) -> list[str]:
+    tokens: list[str] = []
+    for match in re.finditer(r"\$?\s*\d[\d,\s]*\.\d{2}", value):
+        token = match.group(0).replace("$", "")
+        token = re.sub(r"(?<=\d)\s+(?=\d)", "", token)
+        token = token.replace(",", "").strip()
+        if token and _to_decimal_or_none(token):
+            tokens.append(token)
+    return tokens
 
 
 def _extract_line_items_from_text_rows(lines: list[str]) -> list[dict[str, str]]:
@@ -277,19 +344,28 @@ def _cell_at(values: list[str], index: int | None) -> str | None:
 
 def _extract_invoice_number(full_text: str) -> str | None:
     labeled_match = re.search(
-        r"\binvoice\s*(?:number|no\.?|#|id)\s*[:#-]?\s*([A-Z0-9][A-Z0-9\-\/]{2,})",
+        r"\binvoice\s*(?:number|no\.?|#|id)\s*[:#-]?\s*([A-Z0-9][A-Z0-9\-\/]{0,})",
         full_text,
         flags=re.IGNORECASE,
     )
     if labeled_match:
-        return labeled_match.group(1).strip()
+        candidate = labeled_match.group(1).strip()
+        if re.search(r"\d", candidate):
+            return candidate
 
     token_match = re.search(r"\bINV[-/ ]?\d[\w/-]*\b", full_text, flags=re.IGNORECASE)
     return token_match.group(0).strip() if token_match else None
 
 
 def _extract_labeled_date(full_text: str, labels: tuple[str, ...]) -> str | None:
-    date_pattern = r"(\d{4}-\d{1,2}-\d{1,2}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4})"
+    month_pattern = (
+        r"(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|"
+        r"aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)"
+    )
+    date_pattern = (
+        rf"(\d{{4}}-\d{{1,2}}-\d{{1,2}}|\d{{1,2}}[/-]\d{{1,2}}[/-]\d{{2,4}}|"
+        rf"{month_pattern}\s+\d{{1,2}},?\s+\d{{4}})"
+    )
     for label in labels:
         match = re.search(
             rf"{re.escape(label)}\s*[:#-]?\s*{date_pattern}",
@@ -451,12 +527,33 @@ def _parse_json_response(text: str) -> dict[str, Any]:
 
 
 def _search_line_value(lines: list[str], labels: tuple[str, ...]) -> str | None:
-    for line in lines:
+    for index, line in enumerate(lines):
+        normalized = line.strip()
+        if not normalized:
+            continue
+        lowered = normalized.lower()
+
         for label in labels:
-            prefix = f"{label}:"
-            if line.lower().startswith(prefix.lower()):
-                return line[len(prefix) :].strip()
+            label_lower = label.lower()
+            if lowered.startswith(label_lower):
+                suffix = normalized[len(label) :].strip()
+                suffix = re.sub(r"^[:#\-\s]+", "", suffix).strip()
+                if suffix:
+                    return suffix
+
+                for next_index in range(index + 1, len(lines)):
+                    candidate = lines[next_index].strip()
+                    if not candidate:
+                        continue
+                    if _looks_like_label_line(candidate):
+                        break
+                    return candidate
+                break
     return None
+
+
+def _looks_like_label_line(line: str) -> bool:
+    return bool(re.match(r"^[A-Za-z][A-Za-z0-9\s/#-]{0,40}:?$", line.strip()))
 
 
 def _clean(value: object) -> str | None:
