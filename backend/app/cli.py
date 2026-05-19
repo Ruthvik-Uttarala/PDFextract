@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from typing import Any
 
 from app.core import get_settings
@@ -12,9 +13,13 @@ from app.services import (
     build_source_key,
     canonical_storage_prefixes,
     check_database_connection,
+    delete_object,
     ensure_bucket_and_prefixes,
     ensure_topics,
     firebase_status,
+    object_exists,
+    put_processed_artifact,
+    put_source_pdf,
     verify_token,
 )
 
@@ -48,6 +53,49 @@ def ensure_storage() -> int:
             "status": "ok",
             "details": details,
             "prefixes": {"receiving": receiving, "processed": processed},
+        }
+    )
+    return 0
+
+
+def smoke_s3_artifacts(user_id: str, job_id: str, cleanup: bool) -> int:
+    settings = get_settings()
+    try:
+        source_artifact = put_source_pdf(
+            settings,
+            user_id=user_id,
+            job_id=job_id,
+            body=b"%PDF-1.4\n% PDFextract smoke test\n",
+        )
+        processed_artifact = put_processed_artifact(
+            settings,
+            user_id=user_id,
+            job_id=job_id,
+            artifact_name="result.json",
+            body=b'{"status": "ok"}\n',
+            content_type="application/json",
+        )
+        source_exists = object_exists(settings, key=source_artifact.key)
+        processed_exists = object_exists(settings, key=processed_artifact.key)
+        if cleanup:
+            delete_object(settings, key=source_artifact.key)
+            delete_object(settings, key=processed_artifact.key)
+    except Exception as error:
+        _emit({"command": "smoke-s3-artifacts", "status": "error", "message": str(error)})
+        return 1
+
+    _emit(
+        {
+            "command": "smoke-s3-artifacts",
+            "status": "ok",
+            "bucket": settings.s3_bucket_name,
+            "user_id": user_id,
+            "job_id": job_id,
+            "cleanup": cleanup,
+            "source_key": source_artifact.key,
+            "source_exists": source_exists,
+            "processed_key": processed_artifact.key,
+            "processed_exists": processed_exists,
         }
     )
     return 0
@@ -148,6 +196,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     storage_parser.add_argument("--user-id", required=True)
     storage_parser.add_argument("--job-id", required=True)
 
+    s3_smoke_parser = subparsers.add_parser("smoke-s3-artifacts")
+    s3_smoke_parser.add_argument("--user-id", default="smoke-user")
+    s3_smoke_parser.add_argument(
+        "--job-id",
+        default=f"smoke-{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}",
+    )
+    s3_smoke_parser.add_argument(
+        "--cleanup",
+        action="store_true",
+        help="Delete the smoke-test objects after verification.",
+    )
+
     subparsers.add_parser("ensure-kafka-topics")
 
     firebase_parser = subparsers.add_parser("smoke-firebase")
@@ -163,6 +223,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return ensure_storage()
     if args.command == "check-storage-layout":
         return check_storage_layout(args.user_id, args.job_id)
+    if args.command == "smoke-s3-artifacts":
+        return smoke_s3_artifacts(args.user_id, args.job_id, bool(args.cleanup))
     if args.command == "ensure-kafka-topics":
         return ensure_kafka_topics()
     if args.command == "smoke-firebase":

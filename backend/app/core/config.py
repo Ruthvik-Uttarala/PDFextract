@@ -26,9 +26,10 @@ class Settings:
     firebase_test_email: str = "test-user@example.com"
     firebase_test_name: str = "Test User"
     s3_bucket_name: str = "pdfextract-local"
-    s3_endpoint_url: str = "http://localhost:9000"
-    aws_access_key_id: str = "minioadmin"
-    aws_secret_access_key: str = "minioadmin"
+    s3_endpoint_url: str = ""
+    aws_region: str = "us-east-2"
+    aws_access_key_id: str = ""
+    aws_secret_access_key: str = ""
     kafka_bootstrap_servers: str = "localhost:9092"
     gemini_model_name: str = "gemini-1.5-pro"
     gemini_project_id: str = ""
@@ -102,6 +103,7 @@ class Settings:
             s3_bucket_name=_read_env("S3_BUCKET_NAME", cls.s3_bucket_name) or cls.s3_bucket_name,
             s3_endpoint_url=_read_env("S3_ENDPOINT_URL", cls.s3_endpoint_url)
             or cls.s3_endpoint_url,
+            aws_region=_read_env("AWS_REGION", cls.aws_region) or cls.aws_region,
             aws_access_key_id=_read_env("AWS_ACCESS_KEY_ID", cls.aws_access_key_id)
             or cls.aws_access_key_id,
             aws_secret_access_key=_read_env("AWS_SECRET_ACCESS_KEY", cls.aws_secret_access_key)

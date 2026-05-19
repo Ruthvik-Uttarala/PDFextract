@@ -12,7 +12,7 @@ from app.db.models import User
 from app.db.repositories import create_file_record, create_job, mark_job_failed
 from app.services.job_service import serialize_job_summary
 from app.services.kafka_service import build_job_event, publish_submit_event
-from app.services.storage_service import build_source_key, put_object_bytes
+from app.services.storage_service import put_source_pdf
 from app.services.worker_service import process_worker_event
 
 ALLOWED_PDF_CONTENT_TYPES = {"application/pdf", "application/x-pdf", "application/octet-stream"}
@@ -32,13 +32,12 @@ def submit_upload(
     )
     job = create_job(session, user_id=user.id, source_filename=original_filename)
 
-    source_key = build_source_key(settings, user.id, job.id)
     try:
-        storage_metadata = put_object_bytes(
+        source_artifact = put_source_pdf(
             settings,
-            key=source_key,
+            user_id=user.id,
+            job_id=job.id,
             body=file_bytes,
-            content_type=content_type,
         )
     except Exception as exc:
         mark_job_failed(
@@ -63,11 +62,11 @@ def submit_upload(
         job_id=job.id,
         file_role=FileRole.SOURCE_PDF,
         original_filename=original_filename,
-        storage_bucket=str(storage_metadata["bucket"]),
-        storage_key=str(storage_metadata["key"]),
+        storage_bucket=source_artifact.bucket,
+        storage_key=source_artifact.key,
         content_type=content_type,
-        size_bytes=_coerce_size_bytes(storage_metadata),
-        etag=str(storage_metadata.get("etag") or "") or None,
+        size_bytes=source_artifact.size_bytes,
+        etag=source_artifact.etag,
     )
     job.source_file_id = file_record.id
     job.current_stage = JobStage.SOURCE_STORED
@@ -172,13 +171,6 @@ def validate_pdf_upload(
         )
 
     return file_bytes, original_filename, "application/pdf"
-
-
-def _coerce_size_bytes(storage_metadata: dict[str, object]) -> int:
-    value = storage_metadata.get("size_bytes")
-    if value is None:
-        return 0
-    return int(str(value))
 
 
 def _inline_queue_enabled(settings: Settings) -> bool:

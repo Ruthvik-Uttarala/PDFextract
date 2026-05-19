@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import sys
+from base64 import b64decode
 from collections.abc import Callable, Generator
 from io import BytesIO
 from pathlib import Path
@@ -127,6 +128,19 @@ def report_pdf_bytes() -> bytes:
     )
 
 
+@pytest.fixture()
+def image_pdf_bytes() -> bytes:
+    return _build_pdf_with_embedded_image(
+        [
+            "Invoice",
+            "Vendor: Northwind Supplies",
+            "Invoice Number: INV-2002",
+            "Invoice Date: 2026-04-09",
+            "Total: 100",
+        ]
+    )
+
+
 def _build_pdf_bytes(lines: list[str]) -> bytes:
     document = fitz.open()
     page = document.new_page()
@@ -134,6 +148,22 @@ def _build_pdf_bytes(lines: list[str]) -> bytes:
     pdf_bytes = document.tobytes()
     document.close()
     return pdf_bytes
+
+
+def _build_pdf_with_embedded_image(lines: list[str]) -> bytes:
+    document = fitz.open()
+    page = document.new_page()
+    page.insert_text((72, 72), "\n".join(lines))
+    page.insert_image(fitz.Rect(72, 220, 172, 320), stream=_tiny_png_bytes())
+    pdf_bytes = document.tobytes()
+    document.close()
+    return pdf_bytes
+
+
+def _tiny_png_bytes() -> bytes:
+    return b64decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y8QfF8AAAAASUVORK5CYII="
+    )
 
 
 def build_upload_data(file_name: str, payload: bytes) -> dict[str, tuple[BytesIO, str]]:

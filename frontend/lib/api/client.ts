@@ -53,7 +53,19 @@ export async function downloadJobOutput(jobId: string): Promise<Blob> {
 }
 
 export async function downloadJobJson(jobId: string): Promise<Blob> {
-  return apiFetchBlob(`/api/jobs/${jobId}/download/json`);
+  return apiFetchBlob(`/api/jobs/${jobId}/downloads/json`);
+}
+
+export async function downloadJobText(jobId: string): Promise<Blob> {
+  return apiFetchBlob(`/api/jobs/${jobId}/downloads/text`);
+}
+
+export async function downloadJobTableCsv(jobId: string, tableIndex: number): Promise<Blob> {
+  return apiFetchBlob(`/api/jobs/${jobId}/downloads/tables/${tableIndex}.csv`);
+}
+
+export async function downloadJobImage(jobId: string, imageId: string): Promise<Blob> {
+  return apiFetchBlob(`/api/jobs/${jobId}/downloads/images/${encodeURIComponent(imageId)}`);
 }
 
 export async function listAdminJobs(): Promise<JobSummary[]> {

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import base64
+import csv
 import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from io import StringIO
 from typing import Any
 from uuid import uuid4
 
@@ -32,7 +34,7 @@ from app.db.repositories import (
 from app.services.excel_service import generate_excel_workbook
 from app.services.extraction_service import extract_document_data
 from app.services.pdf_reader_service import read_pdf_document
-from app.services.storage_service import build_processed_key, get_object_bytes, put_object_bytes
+from app.services.storage_service import get_object_bytes, put_processed_artifact
 from app.services.validation_service import validate_normalized_output
 
 
@@ -108,6 +110,10 @@ def process_worker_event(
         session.commit()
 
         extraction = extract_document_data(settings, prepared_pdf)
+        extracted_tables = _serialize_tables_for_payload(prepared_pdf.tables)
+        enriched_extracted_json = dict(extraction.extracted_json)
+        enriched_extracted_json["text_content"] = prepared_pdf.full_text
+        enriched_extracted_json["extracted_tables"] = extracted_tables
         job.document_type = extraction.document_type
         job.current_stage = JobStage.VALIDATION
 
@@ -118,7 +124,7 @@ def process_worker_event(
             processing_attempt_id=attempt.id,
             document_type=extraction.document_type,
             schema_version=extraction.schema_version,
-            extracted_json=extraction.extracted_json,
+            extracted_json=enriched_extracted_json,
             normalized_json=extraction.normalized_json,
             validation_passed=validation_result.valid,
             validation_errors=validation_result.errors or None,
@@ -156,40 +162,118 @@ def process_worker_event(
         session.commit()
 
         job.current_stage = JobStage.ARTIFACT_STORAGE
-        processed_key = build_processed_key(settings, job.user_id, job.id)
+        normalized_payload = extraction.normalized_json or extraction.extracted_json
+        json_bytes = json.dumps(normalized_payload, indent=2, ensure_ascii=True).encode("utf-8")
+        text_bytes = prepared_pdf.full_text.encode("utf-8")
+
         try:
-            storage_metadata = put_object_bytes(
+            excel_artifact = put_processed_artifact(
                 settings,
-                key=processed_key,
+                user_id=job.user_id,
+                job_id=job.id,
+                artifact_name="output.xlsx",
                 body=workbook_bytes,
                 content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+            json_artifact = put_processed_artifact(
+                settings,
+                user_id=job.user_id,
+                job_id=job.id,
+                artifact_name="result.json",
+                body=json_bytes,
+                content_type="application/json",
+            )
+            text_artifact = put_processed_artifact(
+                settings,
+                user_id=job.user_id,
+                job_id=job.id,
+                artifact_name="text.txt",
+                body=text_bytes,
+                content_type="text/plain; charset=utf-8",
             )
         except Exception as error:
             raise ApiError(
                 code=FailureCode.OUTPUT_STORAGE_FAILED,
-                message="The Excel output could not be stored.",
+                message="A required artifact could not be stored.",
                 details={"reason": str(error)},
             ) from error
-        processed_file = create_file_record(
+
+        _persist_output_artifact(
             session,
             job_id=job.id,
+            attempt_id=attempt.id,
+            artifact_type=ArtifactType.EXCEL,
             file_role=FileRole.PROCESSED_EXCEL,
             original_filename="output.xlsx",
-            storage_bucket=str(storage_metadata["bucket"]),
-            storage_key=str(storage_metadata["key"]),
-            content_type=str(storage_metadata["content_type"]),
-            size_bytes=_coerce_size_bytes(storage_metadata),
-            etag=str(storage_metadata.get("etag") or "") or None,
+            stored=excel_artifact,
+            set_as_current=True,
         )
-        artifact = create_output_artifact(
+        _persist_output_artifact(
             session,
             job_id=job.id,
-            processing_attempt_id=attempt.id,
-            artifact_type=ArtifactType.EXCEL,
-            file_record_id=processed_file.id,
-            is_current=True,
+            attempt_id=attempt.id,
+            artifact_type=ArtifactType.JSON,
+            file_role=FileRole.PROCESSED_JSON,
+            original_filename="result.json",
+            stored=json_artifact,
+            set_as_current=True,
         )
-        set_current_output_artifact(session, artifact=artifact)
+        _persist_output_artifact(
+            session,
+            job_id=job.id,
+            attempt_id=attempt.id,
+            artifact_type=ArtifactType.TEXT,
+            file_role=FileRole.PROCESSED_TEXT,
+            original_filename="text.txt",
+            stored=text_artifact,
+            set_as_current=True,
+        )
+
+        for table_payload in extracted_tables:
+            table_index_raw = table_payload.get("table_index")
+            if not isinstance(table_index_raw, int):
+                continue
+            table_index = table_index_raw
+            csv_bytes = _table_payload_to_csv_bytes(table_payload)
+            table_stored = put_processed_artifact(
+                settings,
+                user_id=job.user_id,
+                job_id=job.id,
+                artifact_name=f"tables/table_{table_index}.csv",
+                body=csv_bytes,
+                content_type="text/csv; charset=utf-8",
+            )
+            _persist_output_artifact(
+                session,
+                job_id=job.id,
+                attempt_id=attempt.id,
+                artifact_type=ArtifactType.TABLE_CSV,
+                file_role=FileRole.PROCESSED_TABLE_CSV,
+                original_filename=f"table_{table_index}.csv",
+                stored=table_stored,
+                set_as_current=False,
+            )
+
+        for image in prepared_pdf.images:
+            image_stored = put_processed_artifact(
+                settings,
+                user_id=job.user_id,
+                job_id=job.id,
+                artifact_name=f"images/{image.filename}",
+                body=image.bytes_data,
+                content_type=image.content_type,
+            )
+            _persist_output_artifact(
+                session,
+                job_id=job.id,
+                attempt_id=attempt.id,
+                artifact_type=ArtifactType.IMAGE,
+                file_role=FileRole.PROCESSED_IMAGE,
+                original_filename=image.filename,
+                stored=image_stored,
+                set_as_current=False,
+            )
+
         job.current_stage = JobStage.COMPLETION_PERSISTED
         mark_attempt_succeeded(session, attempt=attempt)
         mark_job_completed(
@@ -253,6 +337,83 @@ def normalize_worker_payload(event: dict[str, Any]) -> dict[str, Any]:
                 return json.loads(body)
 
     raise ApiError(code=FailureCode.BAD_REQUEST, message="Unsupported worker event format.")
+
+
+def _persist_output_artifact(
+    session: Session,
+    *,
+    job_id: str,
+    attempt_id: str,
+    artifact_type: str,
+    file_role: str,
+    original_filename: str,
+    stored: Any,
+    set_as_current: bool,
+) -> FileRecord:
+    file_record = create_file_record(
+        session,
+        job_id=job_id,
+        file_role=file_role,
+        original_filename=original_filename,
+        storage_bucket=stored.bucket,
+        storage_key=stored.key,
+        content_type=stored.content_type,
+        size_bytes=stored.size_bytes,
+        etag=stored.etag,
+    )
+    artifact = create_output_artifact(
+        session,
+        job_id=job_id,
+        processing_attempt_id=attempt_id,
+        artifact_type=artifact_type,
+        file_record_id=file_record.id,
+        is_current=True,
+    )
+    if set_as_current:
+        set_current_output_artifact(session, artifact=artifact, artifact_type=artifact_type)
+    return file_record
+
+
+def _serialize_tables_for_payload(
+    tables: list[list[list[str | None]]],
+) -> list[dict[str, object]]:
+    serialized: list[dict[str, object]] = []
+    for index, table in enumerate(tables, start=1):
+        normalized_rows = [[str(cell or "").strip() for cell in row] for row in table if row]
+        if not normalized_rows:
+            continue
+
+        first_row = normalized_rows[0]
+        columns = [cell or f"column_{col + 1}" for col, cell in enumerate(first_row)]
+        rows = normalized_rows[1:]
+        if not rows:
+            rows = []
+
+        serialized.append(
+            {
+                "table_index": index,
+                "name": f"Table {index}",
+                "columns": columns,
+                "rows": rows,
+            }
+        )
+    return serialized
+
+
+def _table_payload_to_csv_bytes(table_payload: dict[str, object]) -> bytes:
+    columns_raw = table_payload.get("columns")
+    rows_raw = table_payload.get("rows")
+    columns = [str(value) for value in columns_raw] if isinstance(columns_raw, list) else []
+    rows = rows_raw if isinstance(rows_raw, list) else []
+
+    buffer = StringIO()
+    writer = csv.writer(buffer)
+    if columns:
+        writer.writerow(columns)
+    for row in rows:
+        if isinstance(row, list):
+            writer.writerow([str(value) for value in row])
+    return buffer.getvalue().encode("utf-8")
 
 
 def _ensure_processing_attempt(
@@ -343,10 +504,3 @@ def _coerce_optional_string(value: object) -> str | None:
         return None
     text = str(value).strip()
     return text or None
-
-
-def _coerce_size_bytes(storage_metadata: dict[str, object]) -> int:
-    value = storage_metadata.get("size_bytes")
-    if value is None:
-        return 0
-    return int(str(value))

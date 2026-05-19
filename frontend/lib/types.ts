@@ -38,6 +38,7 @@ export type JobDetail = JobSummary & {
 };
 
 export type ExtractionTable = {
+  table_index: number;
   name: string;
   columns: string[];
   rows: string[][];

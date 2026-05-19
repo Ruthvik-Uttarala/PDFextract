@@ -48,6 +48,10 @@ class JobStage:
 class FileRole:
     SOURCE_PDF = "source_pdf"
     PROCESSED_EXCEL = "processed_excel"
+    PROCESSED_JSON = "processed_json"
+    PROCESSED_TEXT = "processed_text"
+    PROCESSED_TABLE_CSV = "processed_table_csv"
+    PROCESSED_IMAGE = "processed_image"
 
 
 class DocumentType:
@@ -62,6 +66,10 @@ class AttemptTriggerType:
 
 class ArtifactType:
     EXCEL = "excel"
+    JSON = "json"
+    TEXT = "text"
+    TABLE_CSV = "table_csv"
+    IMAGE = "image"
 
 
 class AdminActionType:
