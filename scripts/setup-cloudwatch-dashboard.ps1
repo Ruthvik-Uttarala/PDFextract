@@ -42,6 +42,9 @@ $dashboard = @{
 
 $dashboardJson = $dashboard | ConvertTo-Json -Depth 8 -Compress
 aws cloudwatch put-dashboard --dashboard-name $DashboardName --dashboard-body $dashboardJson --region $Region
+if ($LASTEXITCODE -ne 0) {
+  throw "cloudwatch:PutDashboard failed (exit code $LASTEXITCODE)."
+}
 Write-Output "Dashboard updated: $DashboardName"
 
 if ($CreateS3ErrorAlarms) {
