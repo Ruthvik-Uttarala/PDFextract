@@ -17,7 +17,22 @@ class PreparedPdf:
     pages: list[str]
     full_text: str
     tables: list[list[list[str | None]]]
+    images: list[PdfImage]
     document_type: str
+
+
+@dataclass(frozen=True)
+class PdfImage:
+    image_index: int
+    extension: str
+    content_type: str
+    bytes_data: bytes
+    width: int | None
+    height: int | None
+
+    @property
+    def filename(self) -> str:
+        return f"image_{self.image_index}.{self.extension}"
 
 
 def read_pdf_document(pdf_bytes: bytes, *, source_filename: str | None = None) -> PreparedPdf:
@@ -31,10 +46,50 @@ def read_pdf_document(pdf_bytes: bytes, *, source_filename: str | None = None) -
         ) from exc
 
     pages: list[str] = []
+    images: list[PdfImage] = []
+    image_index = 0
+    seen_xrefs: set[int] = set()
     try:
         for page in document:
             text = page.get_text("text").strip()
             pages.append(text)
+            page_images = page.get_images(full=True)
+            for image_entry in page_images:
+                if not image_entry:
+                    continue
+                xref = int(image_entry[0])
+                if xref in seen_xrefs:
+                    continue
+                seen_xrefs.add(xref)
+
+                extracted = document.extract_image(xref)
+                image_bytes = extracted.get("image")
+                if not isinstance(image_bytes, bytes) or not image_bytes:
+                    continue
+
+                extension = str(extracted.get("ext") or "png").strip().lower()
+                if extension == "jpg":
+                    extension = "jpeg"
+
+                image_index += 1
+                images.append(
+                    PdfImage(
+                        image_index=image_index,
+                        extension=extension,
+                        content_type=f"image/{extension}",
+                        bytes_data=image_bytes,
+                        width=(
+                            int(extracted["width"])
+                            if isinstance(extracted.get("width"), int)
+                            else None
+                        ),
+                        height=(
+                            int(extracted["height"])
+                            if isinstance(extracted.get("height"), int)
+                            else None
+                        ),
+                    )
+                )
     finally:
         document.close()
 
@@ -52,6 +107,7 @@ def read_pdf_document(pdf_bytes: bytes, *, source_filename: str | None = None) -
         pages=pages,
         full_text=full_text,
         tables=tables,
+        images=images,
         document_type=document_type,
     )
 

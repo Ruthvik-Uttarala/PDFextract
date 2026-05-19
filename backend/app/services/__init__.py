@@ -9,7 +9,13 @@ from .auth_service import (
     require_auth,
 )
 from .database_service import check_database_connection, ping_postgres
-from .download_service import resolve_download_artifact
+from .download_service import (
+    resolve_download_artifact,
+    resolve_image_download_artifact,
+    resolve_json_download_artifact,
+    resolve_table_download_artifact,
+    resolve_text_download_artifact,
+)
 from .excel_service import generate_excel_workbook
 from .extraction_service import (
     ExtractionPayload,
@@ -43,18 +49,25 @@ from .kafka_service import (
     publish_retry_event,
     publish_submit_event,
 )
-from .pdf_reader_service import PreparedPdf, classify_document_type, read_pdf_document
+from .pdf_reader_service import PdfImage, PreparedPdf, classify_document_type, read_pdf_document
 from .storage_service import (
+    ArtifactDownload,
+    StoredArtifact,
+    build_processed_artifact_key,
     build_processed_key,
     build_source_key,
     canonical_storage_prefixes,
     check_storage_connection,
     delete_object,
     ensure_bucket_and_prefixes,
+    get_artifact_download,
     get_object_bytes,
+    list_job_artifacts,
     object_exists,
     ping_storage,
     put_object_bytes,
+    put_processed_artifact,
+    put_source_pdf,
     stream_object,
 )
 from .upload_service import submit_upload, validate_pdf_upload
@@ -62,22 +75,26 @@ from .validation_service import ValidationResult, validate_normalized_output
 from .worker_service import WorkerExecutionResult, normalize_worker_payload, process_worker_event
 
 __all__ = [
-    "ExtractionPayload",
+    "ArtifactDownload",
     "AuthenticatedContext",
+    "ExtractionPayload",
     "KafkaJobEvent",
+    "PdfImage",
     "PreparedPdf",
     "REQUIRED_TOPICS",
+    "StoredArtifact",
     "ValidationResult",
     "WorkerExecutionResult",
     "authenticate_request",
-    "build_processed_key",
     "build_job_event",
+    "build_processed_artifact_key",
+    "build_processed_key",
     "build_source_key",
+    "canonical_storage_prefixes",
     "check_database_connection",
     "check_kafka_connection",
     "check_storage_connection",
     "classify_document_type",
-    "canonical_storage_prefixes",
     "consume_single_event",
     "delete_object",
     "ensure_bucket_and_prefixes",
@@ -86,6 +103,7 @@ __all__ = [
     "firebase_status",
     "generate_excel_workbook",
     "get_admin_job_payload",
+    "get_artifact_download",
     "get_authenticated_claims",
     "get_authenticated_user",
     "get_bearer_token_from_request",
@@ -95,6 +113,7 @@ __all__ = [
     "initialize_auth",
     "initialize_firebase_app",
     "list_admin_job_payloads",
+    "list_job_artifacts",
     "list_user_job_payloads",
     "normalize_extraction_output",
     "normalize_worker_payload",
@@ -106,10 +125,16 @@ __all__ = [
     "publish_retry_event",
     "publish_submit_event",
     "put_object_bytes",
+    "put_processed_artifact",
+    "put_source_pdf",
     "read_pdf_document",
     "require_admin",
     "require_auth",
     "resolve_download_artifact",
+    "resolve_image_download_artifact",
+    "resolve_json_download_artifact",
+    "resolve_table_download_artifact",
+    "resolve_text_download_artifact",
     "retry_job",
     "serialize_job_detail",
     "serialize_job_summary",

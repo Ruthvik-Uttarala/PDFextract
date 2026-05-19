@@ -194,9 +194,7 @@ def _extract_line_items_from_pdf_tables(
             if not description:
                 continue
             has_numeric_cell = (
-                _looks_numeric(quantity)
-                or _looks_numeric(unit_price)
-                or _looks_numeric(line_total)
+                _looks_numeric(quantity) or _looks_numeric(unit_price) or _looks_numeric(line_total)
             )
             if not has_numeric_cell:
                 continue

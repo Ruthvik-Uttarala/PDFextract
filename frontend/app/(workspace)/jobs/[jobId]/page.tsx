@@ -6,8 +6,16 @@ import { useCallback, useMemo, useState } from "react";
 
 import { useAuth } from "@/components/providers/auth-provider";
 import { usePollingResource } from "@/hooks/use-polling-resource";
-import { downloadJobJson, downloadJobOutput, getJobDetail } from "@/lib/api/client";
+import {
+  downloadJobImage,
+  downloadJobJson,
+  downloadJobOutput,
+  downloadJobTableCsv,
+  downloadJobText,
+  getJobDetail,
+} from "@/lib/api/client";
 import { triggerBrowserDownload } from "@/lib/download";
+import { getApiBaseUrl } from "@/lib/env";
 import { formatFileSize, formatTimestamp } from "@/lib/format";
 import type { JobDetail, JobTimelineItem } from "@/lib/types";
 
@@ -66,13 +74,18 @@ export default function JobDetailPage({ params }: { params: { jobId: string } })
     );
   }
 
-  function handleDownloadText(): void {
+  async function handleDownloadText(): Promise<void> {
     if (!job?.extraction?.text_preview) {
       setInfoMessage("No extracted text available yet.");
       return;
     }
-    const blob = new Blob([job.extraction.text_preview], { type: "text/plain;charset=utf-8" });
-    triggerBrowserDownload(blob, job.source_filename.replace(/\.pdf$/i, ".txt"));
+    try {
+      const blob = await downloadJobText(job.job_id);
+      triggerBrowserDownload(blob, job.source_filename.replace(/\.pdf$/i, ".txt"));
+      setInfoMessage(null);
+    } catch (reason) {
+      setInfoMessage(reason instanceof Error ? reason.message : "Text download failed.");
+    }
   }
 
   async function handleDownloadJson(): Promise<void> {
@@ -100,11 +113,31 @@ export default function JobDetailPage({ params }: { params: { jobId: string } })
     );
   }
 
-  function handleDownloadTableCsv(name: string, columns: string[], rows: string[][]): void {
-    const csv = [columns.join(","), ...rows.map((row) => row.map(csvEscape).join(","))].join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const safeName = name.toLowerCase().replace(/[^a-z0-9]+/g, "_");
-    triggerBrowserDownload(blob, `${safeName || "table"}.csv`);
+  async function handleDownloadTableCsv(tableIndex: number, name: string): Promise<void> {
+    if (!job) {
+      return;
+    }
+    try {
+      const blob = await downloadJobTableCsv(job.job_id, tableIndex);
+      const safeName = name.toLowerCase().replace(/[^a-z0-9]+/g, "_");
+      triggerBrowserDownload(blob, `${safeName || `table_${tableIndex}`}.csv`);
+      setInfoMessage(null);
+    } catch (reason) {
+      setInfoMessage(reason instanceof Error ? reason.message : "Table download failed.");
+    }
+  }
+
+  async function handleDownloadImage(imageId: string, name: string): Promise<void> {
+    if (!job) {
+      return;
+    }
+    try {
+      const blob = await downloadJobImage(job.job_id, imageId);
+      triggerBrowserDownload(blob, name);
+      setInfoMessage(null);
+    } catch (reason) {
+      setInfoMessage(reason instanceof Error ? reason.message : "Image download failed.");
+    }
   }
 
   if (loading && !job) {
@@ -203,7 +236,7 @@ export default function JobDetailPage({ params }: { params: { jobId: string } })
                   <button className="button button--secondary button--small" onClick={handleCopyText}>
                     Copy Text
                   </button>
-                  <button className="button button--secondary button--small" onClick={handleDownloadText}>
+                  <button className="button button--secondary button--small" onClick={() => void handleDownloadText()}>
                     Download TXT
                   </button>
                 </div>
@@ -221,9 +254,7 @@ export default function JobDetailPage({ params }: { params: { jobId: string } })
                           <h3>{table.name}</h3>
                           <button
                             className="button button--secondary button--small"
-                            onClick={() =>
-                              handleDownloadTableCsv(table.name, table.columns, table.rows)
-                            }
+                            onClick={() => void handleDownloadTableCsv(table.table_index, table.name)}
                           >
                             Download CSV
                           </button>
@@ -264,9 +295,15 @@ export default function JobDetailPage({ params }: { params: { jobId: string } })
                   <div className="results-images-grid">
                     {extractedImages.map((image) => (
                       <article key={image.id} className="results-image-card">
-                        <Image src={image.preview_url} alt={image.name} width={260} height={170} unoptimized />
+                        <Image src={`${getApiBaseUrl()}${image.preview_url}`} alt={image.name} width={260} height={170} unoptimized />
                         <p>{image.name}</p>
                         <span>{image.size_label}</span>
+                        <button
+                          className="button button--secondary button--small"
+                          onClick={() => void handleDownloadImage(image.id, image.name)}
+                        >
+                          Download
+                        </button>
                       </article>
                     ))}
                   </div>
@@ -369,11 +406,4 @@ function getProcessingPercent(currentStage: string | null, status: JobDetail["st
     return 10;
   }
   return stageMap[currentStage] ?? 10;
-}
-
-function csvEscape(value: string): string {
-  if (value.includes(",") || value.includes("\"") || value.includes("\n")) {
-    return `"${value.replace(/"/g, "\"\"")}"`;
-  }
-  return value;
 }

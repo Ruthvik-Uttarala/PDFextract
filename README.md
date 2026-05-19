@@ -138,6 +138,10 @@ The backend API surface is now:
 - `GET /api/jobs`
 - `GET /api/jobs/{job_id}`
 - `GET /api/jobs/{job_id}/download`
+- `GET /api/jobs/{job_id}/downloads/json`
+- `GET /api/jobs/{job_id}/downloads/text`
+- `GET /api/jobs/{job_id}/downloads/tables/{table_index}.csv`
+- `GET /api/jobs/{job_id}/downloads/images/{image_id}`
 - `GET /api/admin/jobs`
 - `GET /api/admin/jobs/{job_id}`
 - `POST /api/admin/jobs/{job_id}/retry`
@@ -148,10 +152,15 @@ The backend CLI kept for local checks is:
 python -m app.cli check-db
 python -m app.cli ensure-storage
 python -m app.cli check-storage-layout --user-id smoke-user --job-id smoke-job
+python -m app.cli smoke-s3-artifacts --cleanup
 python -m app.cli ensure-kafka-topics
 python -m app.cli smoke-firebase
 python -m app.cli smoke-http
 ```
+
+CloudWatch and S3 runbook:
+
+- `docs/AWS_S3_CLOUDWATCH_RUNBOOK.md`
 
 ## Frontend Surface
 

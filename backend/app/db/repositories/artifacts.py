@@ -45,16 +45,31 @@ def get_current_output_artifact(session: Session, *, job_id: str) -> OutputArtif
     ).scalar_one_or_none()
 
 
+def get_current_output_artifact_by_type(
+    session: Session,
+    *,
+    job_id: str,
+    artifact_type: str,
+) -> OutputArtifact | None:
+    return session.execute(
+        select(OutputArtifact).where(
+            OutputArtifact.job_id == job_id,
+            OutputArtifact.artifact_type == artifact_type,
+            OutputArtifact.is_current.is_(True),
+        )
+    ).scalar_one_or_none()
+
+
 def set_current_output_artifact(
     session: Session,
     *,
     artifact: OutputArtifact,
+    artifact_type: str | None = None,
 ) -> OutputArtifact:
-    session.execute(
-        update(OutputArtifact)
-        .where(OutputArtifact.job_id == artifact.job_id)
-        .values(is_current=False)
-    )
+    filters = [OutputArtifact.job_id == artifact.job_id]
+    if artifact_type:
+        filters.append(OutputArtifact.artifact_type == artifact_type)
+    session.execute(update(OutputArtifact).where(*filters).values(is_current=False))
     artifact.is_current = True
     session.flush()
     return artifact

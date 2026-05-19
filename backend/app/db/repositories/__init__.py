@@ -2,6 +2,7 @@ from .admin_actions import create_admin_action, list_admin_actions_for_job
 from .artifacts import (
     create_output_artifact,
     get_current_output_artifact,
+    get_current_output_artifact_by_type,
     list_output_artifacts_for_job,
     set_current_output_artifact,
 )
@@ -46,6 +47,7 @@ __all__ = [
     "create_output_artifact",
     "create_processing_attempt",
     "get_current_output_artifact",
+    "get_current_output_artifact_by_type",
     "get_extraction_result_for_attempt",
     "get_latest_extraction_result_for_job",
     "get_file_record",

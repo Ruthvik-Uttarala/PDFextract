@@ -138,7 +138,7 @@ def test_worker_processing_creates_artifact_and_downloads_excel(
     assert "Traceability" in workbook.sheetnames
     assert "Line Items" in workbook.sheetnames
     json_download_response = client.get(
-        f"/api/jobs/{job_id}/download/json",
+        f"/api/jobs/{job_id}/downloads/json",
         headers=auth_headers("user-token"),
     )
     assert json_download_response.status_code == 200
@@ -147,6 +147,13 @@ def test_worker_processing_creates_artifact_and_downloads_excel(
     assert payload["document_type"] == "invoice"
     assert payload["invoice_number"] == "INV-1001"
     assert isinstance(payload.get("line_items"), list)
+    text_download_response = client.get(
+        f"/api/jobs/{job_id}/downloads/text",
+        headers=auth_headers("user-token"),
+    )
+    assert text_download_response.status_code == 200
+    assert text_download_response.mimetype == "text/plain"
+    assert "Invoice" in text_download_response.data.decode("utf-8")
 
     with session_scope(settings) as session:
         job = get_job(session, job_id)
@@ -302,9 +309,47 @@ def test_download_json_before_processing_returns_not_found(
     )
     job_id = str(upload_response.get_json()["job_id"])
 
-    response = client.get(f"/api/jobs/{job_id}/download/json", headers=auth_headers("user-token"))
+    response = client.get(f"/api/jobs/{job_id}/downloads/json", headers=auth_headers("user-token"))
     assert response.status_code == 404
     assert response.get_json()["error"]["code"] == FailureCode.ARTIFACT_NOT_FOUND
+
+
+def test_worker_persists_real_image_artifacts_when_pdf_contains_embedded_images(
+    client: FlaskClient,
+    settings: Settings,
+    auth_headers: Callable[[str], dict[str, str]],
+    image_pdf_bytes: bytes,
+) -> None:
+    upload_response = client.post(
+        "/api/uploads",
+        headers=auth_headers("user-token"),
+        data=build_upload_data("image-invoice.pdf", image_pdf_bytes),
+    )
+    job_id = str(upload_response.get_json()["job_id"])
+    event = _consume_matching_event(settings, KAFKA_TOPICS.submit, job_id)
+
+    with session_scope(settings) as session:
+        process_worker_event(
+            session,
+            settings=settings,
+            event_payload=event,
+            worker_request_id="worker-image-artifact",
+        )
+
+    detail_response = client.get(f"/api/jobs/{job_id}", headers=auth_headers("user-token"))
+    assert detail_response.status_code == 200
+    detail_payload = detail_response.get_json()
+    images = detail_payload["extraction"]["images"]
+    assert len(images) > 0
+
+    first_image = images[0]
+    image_download_response = client.get(
+        f"/api/jobs/{job_id}/downloads/images/{first_image['id']}",
+        headers=auth_headers("user-token"),
+    )
+    assert image_download_response.status_code == 200
+    assert image_download_response.mimetype is not None
+    assert image_download_response.mimetype.startswith("image/")
 
 
 def test_admin_retry_creates_new_attempt_and_retry_event(

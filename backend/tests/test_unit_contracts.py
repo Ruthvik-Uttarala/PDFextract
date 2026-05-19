@@ -119,6 +119,7 @@ def test_mock_invoice_extraction_handles_split_labels_and_two_column_table() -> 
                 ["Laundry service (Aprons) from April 2011 (10 pieces x $7)", None],
             ]
         ],
+        images=[],
         document_type="invoice",
     )
 

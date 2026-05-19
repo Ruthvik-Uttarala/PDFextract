@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.core import (
     AdminActionType,
+    ArtifactType,
     FailureCode,
     FileRole,
     JobStage,
@@ -16,7 +17,7 @@ from app.db.models import Job, User
 from app.db.repositories import (
     create_admin_action,
     create_processing_attempt,
-    get_current_output_artifact,
+    get_current_output_artifact_by_type,
     get_file_record,
     get_job,
     get_job_for_user,
@@ -25,6 +26,7 @@ from app.db.repositories import (
     list_admin_actions_for_job,
     list_jobs_for_admin,
     list_jobs_for_user,
+    list_output_artifacts_for_job,
     list_processing_attempts_for_job,
     mark_attempt_failed,
     mark_job_failed,
@@ -216,7 +218,11 @@ def serialize_job_detail(
             }
             for action in list_admin_actions_for_job(session, job_id=job.id)
         ]
-        artifact = get_current_output_artifact(session, job_id=job.id)
+        artifact = get_current_output_artifact_by_type(
+            session,
+            job_id=job.id,
+            artifact_type=ArtifactType.EXCEL,
+        )
         artifact_file = get_file_record(session, artifact.file_record_id) if artifact else None
         payload["storage"] = {
             "source_file_id": job.source_file_id,
@@ -240,8 +246,8 @@ def _build_extraction_preview(session: Session, *, job: Job) -> dict[str, object
         "schema_version": result.schema_version,
         "document_type": result.document_type,
         "text_preview": _build_extraction_text_preview(normalized_json, extracted_json),
-        "tables": _build_extraction_tables_preview(normalized_json),
-        "images": [],
+        "tables": _build_extraction_tables_preview(extracted_json),
+        "images": _build_extraction_images_preview(session, job=job),
         "normalized_json": normalized_json,
         "extracted_json": extracted_json,
         "validation_passed": result.validation_passed,
@@ -253,6 +259,10 @@ def _build_extraction_text_preview(
     normalized_json: dict[str, object] | None,
     extracted_json: dict[str, object],
 ) -> str:
+    text_content = extracted_json.get("text_content")
+    if isinstance(text_content, str) and text_content.strip():
+        return text_content.strip()
+
     if normalized_json and normalized_json.get("document_type") == "invoice":
         vendor_raw = normalized_json.get("vendor")
         vendor_name = vendor_raw.get("name") if isinstance(vendor_raw, dict) else None
@@ -304,56 +314,67 @@ def _build_extraction_text_preview(
     return str(extracted_json)
 
 
-def _build_extraction_tables_preview(
-    normalized_json: dict[str, object] | None,
-) -> list[dict[str, object]]:
-    if not isinstance(normalized_json, dict):
-        return []
-
-    if normalized_json.get("document_type") == "invoice":
-        line_items = normalized_json.get("line_items")
-        if not isinstance(line_items, list):
-            return []
-        rows: list[list[str]] = []
-        for item in line_items:
-            if not isinstance(item, dict):
+def _build_extraction_tables_preview(extracted_json: dict[str, object]) -> list[dict[str, object]]:
+    extracted_tables = extracted_json.get("extracted_tables")
+    if isinstance(extracted_tables, list):
+        payload_tables: list[dict[str, object]] = []
+        for table in extracted_tables:
+            if not isinstance(table, dict):
                 continue
-            rows.append(
-                [
-                    str(item.get("description") or ""),
-                    str(item.get("quantity") or ""),
-                    str(item.get("unit_price") or ""),
-                    str(item.get("line_total") or ""),
-                ]
-            )
-        return [
-            {
-                "name": "Line Items",
-                "columns": ["Description", "Quantity", "Unit Price", "Line Total"],
-                "rows": rows,
-            }
-        ]
-
-    if normalized_json.get("document_type") == "research_report":
-        sections = normalized_json.get("sections")
-        if not isinstance(sections, list):
-            return []
-        section_rows: list[list[str]] = []
-        for section in sections:
-            if not isinstance(section, dict):
-                continue
-            section_rows.append(
-                [str(section.get("heading") or ""), str(section.get("content") or "")]
-            )
-        return [
-            {
-                "name": "Sections",
-                "columns": ["Heading", "Content"],
-                "rows": section_rows,
-            }
-        ]
+            columns = table.get("columns")
+            rows = table.get("rows")
+            table_index = table.get("table_index")
+            if (
+                isinstance(columns, list)
+                and isinstance(rows, list)
+                and isinstance(table_index, int)
+            ):
+                payload_tables.append(
+                    {
+                        "table_index": table_index,
+                        "name": str(table.get("name") or f"Table {table_index}"),
+                        "columns": [str(column) for column in columns],
+                        "rows": [
+                            [str(value) for value in row] for row in rows if isinstance(row, list)
+                        ],
+                    }
+                )
+        if payload_tables:
+            return payload_tables
 
     return []
+
+
+def _build_extraction_images_preview(session: Session, *, job: Job) -> list[dict[str, str]]:
+    if not job.latest_attempt_id:
+        return []
+
+    artifacts = list_output_artifacts_for_job(session, job_id=job.id)
+    image_payloads: list[tuple[int, dict[str, str]]] = []
+    for artifact in artifacts:
+        if artifact.processing_attempt_id != job.latest_attempt_id:
+            continue
+        if artifact.artifact_type != ArtifactType.IMAGE:
+            continue
+        file_record = get_file_record(session, artifact.file_record_id)
+        if file_record is None:
+            continue
+        filename = str(file_record.original_filename or "image")
+        image_index = _extract_image_index(filename)
+        image_payloads.append(
+            (
+                image_index,
+                {
+                    "id": str(image_index),
+                    "name": filename,
+                    "size_label": _format_size_label(file_record.size_bytes),
+                    "preview_url": f"/api/jobs/{job.id}/downloads/images/{image_index}",
+                },
+            )
+        )
+
+    image_payloads.sort(key=lambda item: item[0])
+    return [payload for _, payload in image_payloads]
 
 
 def get_retry_eligibility(
@@ -394,7 +415,11 @@ def get_retry_eligibility(
 
 
 def get_job_artifact_info(session: Session, job: Job) -> JobArtifactInfo:
-    artifact = get_current_output_artifact(session, job_id=job.id)
+    artifact = get_current_output_artifact_by_type(
+        session,
+        job_id=job.id,
+        artifact_type=ArtifactType.EXCEL,
+    )
     if artifact is None:
         return JobArtifactInfo(available=False, file_record_id=None, storage_key=None)
 
@@ -480,6 +505,23 @@ def _friendly_failure_message(failure_code: str | None, fallback: str | None) ->
         FailureCode.ARTIFACT_NOT_FOUND: "The Excel output is not currently available.",
     }
     return messages.get(failure_code, fallback)
+
+
+def _extract_image_index(filename: str) -> int:
+    for token in filename.replace(".", "_").split("_"):
+        if token.isdigit():
+            return int(token)
+    return 0
+
+
+def _format_size_label(size_bytes: int | None) -> str:
+    if size_bytes is None:
+        return "Unknown size"
+    if size_bytes < 1024:
+        return f"{size_bytes} B"
+    if size_bytes < 1024 * 1024:
+        return f"{size_bytes / 1024:.1f} KB"
+    return f"{size_bytes / (1024 * 1024):.1f} MB"
 
 
 def _iso(value: object) -> str | None:

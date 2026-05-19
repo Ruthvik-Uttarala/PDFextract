@@ -6,6 +6,9 @@ import JobDetailPage from "@/app/(workspace)/jobs/[jobId]/page";
 
 const downloadJobOutput = vi.fn();
 const downloadJobJson = vi.fn();
+const downloadJobText = vi.fn();
+const downloadJobTableCsv = vi.fn();
+const downloadJobImage = vi.fn();
 const triggerBrowserDownload = vi.fn();
 const writeClipboard = vi.fn();
 
@@ -60,6 +63,9 @@ vi.mock("@/hooks/use-polling-resource", () => ({
 vi.mock("@/lib/api/client", () => ({
   downloadJobOutput: (...args: unknown[]) => downloadJobOutput(...args),
   downloadJobJson: (...args: unknown[]) => downloadJobJson(...args),
+  downloadJobText: (...args: unknown[]) => downloadJobText(...args),
+  downloadJobTableCsv: (...args: unknown[]) => downloadJobTableCsv(...args),
+  downloadJobImage: (...args: unknown[]) => downloadJobImage(...args),
   getJobDetail: vi.fn()
 }));
 
@@ -71,10 +77,16 @@ describe("JobDetailPage", () => {
   beforeEach(() => {
     downloadJobOutput.mockReset();
     downloadJobJson.mockReset();
+    downloadJobText.mockReset();
+    downloadJobTableCsv.mockReset();
+    downloadJobImage.mockReset();
     triggerBrowserDownload.mockReset();
     writeClipboard.mockReset();
     downloadJobOutput.mockResolvedValue(new Blob(["excel"], { type: "application/octet-stream" }));
     downloadJobJson.mockResolvedValue(new Blob(["json"], { type: "application/json" }));
+    downloadJobText.mockResolvedValue(new Blob(["text"], { type: "text/plain" }));
+    downloadJobTableCsv.mockResolvedValue(new Blob(["csv"], { type: "text/csv" }));
+    downloadJobImage.mockResolvedValue(new Blob(["image"], { type: "image/png" }));
     writeClipboard.mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
