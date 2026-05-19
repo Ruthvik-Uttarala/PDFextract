@@ -92,7 +92,7 @@ export default function UploadPage() {
     <section className="workspace-page">
       <header className="workspace-page__header">
         <h1>Extract data from your PDF</h1>
-        <p>Upload a PDF file and extract text, tables, and images with ease.</p>
+        <p>Upload one PDF to extract text, tables, and images.</p>
       </header>
 
       <section className="upload-card">

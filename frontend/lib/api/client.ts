@@ -52,6 +52,10 @@ export async function downloadJobOutput(jobId: string): Promise<Blob> {
   return apiFetchBlob(`/api/jobs/${jobId}/download`);
 }
 
+export async function downloadJobJson(jobId: string): Promise<Blob> {
+  return apiFetchBlob(`/api/jobs/${jobId}/download/json`);
+}
+
 export async function listAdminJobs(): Promise<JobSummary[]> {
   const payload = await apiFetch<{ jobs: JobSummary[] }>("/api/admin/jobs", {});
   return payload.jobs;
