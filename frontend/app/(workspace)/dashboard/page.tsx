@@ -44,7 +44,7 @@ export default function DashboardPage() {
       <header className="page-header">
         <div>
           <p className="page-header__eyebrow">Dashboard</p>
-          <h2 className="page-header__title">Upload, track, and download with confidence</h2>
+          <h2 className="page-header__title">Upload, track, and download job outputs</h2>
           <p className="page-header__body">
             This workspace shows what you can do now, what is still processing, and which outputs are ready.
           </p>

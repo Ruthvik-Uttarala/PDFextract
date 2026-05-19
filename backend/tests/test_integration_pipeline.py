@@ -137,6 +137,16 @@ def test_worker_processing_creates_artifact_and_downloads_excel(
     assert "Summary" in workbook.sheetnames
     assert "Traceability" in workbook.sheetnames
     assert "Line Items" in workbook.sheetnames
+    json_download_response = client.get(
+        f"/api/jobs/{job_id}/download/json",
+        headers=auth_headers("user-token"),
+    )
+    assert json_download_response.status_code == 200
+    assert json_download_response.mimetype == "application/json"
+    payload = json.loads(json_download_response.data.decode("utf-8"))
+    assert payload["document_type"] == "invoice"
+    assert payload["invoice_number"] == "INV-1001"
+    assert isinstance(payload.get("line_items"), list)
 
     with session_scope(settings) as session:
         job = get_job(session, job_id)
@@ -276,6 +286,23 @@ def test_download_missing_artifact_returns_not_found(
     delete_object(settings, key=output_key)
 
     response = client.get(f"/api/jobs/{job_id}/download", headers=auth_headers("user-token"))
+    assert response.status_code == 404
+    assert response.get_json()["error"]["code"] == FailureCode.ARTIFACT_NOT_FOUND
+
+
+def test_download_json_before_processing_returns_not_found(
+    client: FlaskClient,
+    auth_headers: Callable[[str], dict[str, str]],
+    invoice_pdf_bytes: bytes,
+) -> None:
+    upload_response = client.post(
+        "/api/uploads",
+        headers=auth_headers("user-token"),
+        data=build_upload_data("invoice.pdf", invoice_pdf_bytes),
+    )
+    job_id = str(upload_response.get_json()["job_id"])
+
+    response = client.get(f"/api/jobs/{job_id}/download/json", headers=auth_headers("user-token"))
     assert response.status_code == 404
     assert response.get_json()["error"]["code"] == FailureCode.ARTIFACT_NOT_FOUND
 
