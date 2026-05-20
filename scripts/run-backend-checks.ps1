@@ -26,3 +26,7 @@ docker run --rm `
   -e GEMINI_MODEL_NAME=gemini-1.5-pro `
   -e GEMINI_MOCK_MODE=true `
   python:3.11.11-slim sh -lc $backendCommand
+
+if ($LASTEXITCODE -ne 0) {
+  throw "Backend checks failed (exit code $LASTEXITCODE)."
+}
