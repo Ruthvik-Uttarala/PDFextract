@@ -17,3 +17,7 @@ docker run --rm `
   -e NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=000000000000 `
   -e NEXT_PUBLIC_FIREBASE_APP_ID=1:000000000000:web:local `
   node:22.11.0 sh -lc $frontendCommand
+
+if ($LASTEXITCODE -ne 0) {
+  throw "Frontend checks failed (exit code $LASTEXITCODE)."
+}

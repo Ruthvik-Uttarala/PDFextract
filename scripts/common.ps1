@@ -20,6 +20,9 @@ function Assert-DockerDaemon {
   Initialize-DockerConfig
   Assert-DockerCli
   docker info --format '{{.ServerVersion}}' | Out-Null
+  if ($LASTEXITCODE -ne 0) {
+    throw "Docker daemon is not reachable. Start Docker Desktop and retry."
+  }
 }
 
 function Test-TcpPort {
