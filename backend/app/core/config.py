@@ -181,7 +181,8 @@ def _read_env(name: str, default: str) -> str:
     value = os.getenv(name)
     if value is None or value == "":
         return default
-    return value.strip()
+    normalized = value.replace("\\r", "").replace("\\n", "")
+    return normalized.strip()
 
 
 def _read_bool(value: str | None, *, default: bool) -> bool:
